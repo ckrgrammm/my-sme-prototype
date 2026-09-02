@@ -12,9 +12,11 @@ import MonthlyScreen from './components/MonthlyScreen.jsx';
 import MoreScreen from './components/MoreScreen.jsx';
 import { DispatchModal, SwitcherModal } from './components/Modals.jsx';
 
+const DEFAULT_INDUSTRY = 'renovation';
+
 export default function App() {
   const [industries, setIndustries] = useState([]);
-  const [industry, setIndustry] = useState(null);
+  const [industry, setIndustry] = useState(DEFAULT_INDUSTRY);
   const [cfg, setCfg] = useState(null);
   const [loadError, setLoadError] = useState(null);
   const [view, setView] = useState('home');
@@ -53,12 +55,12 @@ export default function App() {
     api.getIndustries().then(setIndustries).catch((e) => setLoadError(e.message));
     const params = new URLSearchParams(location.search);
     const qIndustry = params.get('industry');
-    const saved = localStorage.getItem('sme_industry');
     if (qIndustry) {
       localStorage.setItem('sme_industry', qIndustry);
       setIndustry(qIndustry);
-    } else if (saved) {
-      setIndustry(saved);
+    } else {
+      localStorage.setItem('sme_industry', DEFAULT_INDUSTRY);
+      setIndustry(DEFAULT_INDUSTRY);
     }
   }, []);
 
