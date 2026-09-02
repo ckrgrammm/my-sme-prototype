@@ -168,7 +168,7 @@ export default function App() {
         {!isStaff && !showDetail && view === 'home' && (
           <HomeScreen cfg={cfg} onOpen={setDetailOrderId} onDispatch={setDispatchOrderId} lang={lang} />
         )}
-        {!isStaff && !showDetail && view === 'workflow' && <WorkflowScreen lang={lang} onToast={showToast} />}
+        {!isStaff && !showDetail && view === 'workflow' && <WorkflowScreen lang={lang} industry={industry} onToast={showToast} />}
         {!isStaff && !showDetail && view === 'field' && <FieldScreen cfg={cfg} onAdvance={handleAdvance} lang={lang} />}
         {!isStaff && !showDetail && view === 'monthly' && <MonthlyScreen cfg={cfg} lang={lang} />}
         {!isStaff && !showDetail && view === 'more' && <MoreScreen cfg={cfg} lang={lang} />}
