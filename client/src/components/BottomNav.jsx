@@ -5,6 +5,7 @@ import { cn } from '../lib/utils.js';
 export default function BottomNav({ cfg, view, onTab, lang, side = 'left' }) {
   const tabs = [
     { key: 'home', icon: '⌂', label: t(lang, 'navHome'), group: lang === 'zh' ? '营运' : 'OPERATIONS' },
+    { key: 'workflow', icon: '⚡', label: lang === 'zh' ? '自动化' : 'Automation' },
     { key: 'field', icon: '▤', label: lang === 'zh' ? '送货' : 'Deliveries' },
     { key: 'monthly', icon: '▥', label: lang === 'zh' ? '收入' : 'Money', group: lang === 'zh' ? '财务' : 'FINANCE' },
     { key: 'more', icon: '•••', label: t(lang, 'navMore'), group: lang === 'zh' ? '其他' : 'OTHER' },
