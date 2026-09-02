@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { fmtMoney } from '../utils.js';
+import { fmtMoney, fmtMoneyShort } from '../utils.js';
 import { pick, t } from '../i18n.js';
 import { cn } from '../lib/utils.js';
 import Badge from './ui/Badge.jsx';
@@ -108,7 +108,7 @@ export default function HomeScreen({ cfg, onOpen, onDispatch, lang }) {
 
       <section className="kpi-grid">
         <KpiCard icon={cfg.emoji} value={orders.length} label={orderLabel} tone="blue" active={filter === 'all'} onClick={() => setFilter('all')} />
-        <KpiCard icon={icons.money} value={fmtMoney(orders.reduce((s, o) => s + o.amount, 0))} label={t(lang, 'kpiRevenue')} tone="indigo" />
+        <KpiCard icon={icons.money} value={fmtMoneyShort(orders.reduce((s, o) => s + o.amount, 0))} label={t(lang, 'kpiRevenue')} tone="indigo" />
         <KpiCard icon={icons.route} value={counts.active} label={pick(lang, cfg.stageLabels.active)} tone="green" active={filter === 'active'} onClick={() => setFilter('active')} />
         <KpiCard icon={icons.alert} value={counts.problem} label={t(lang, 'statProblem')} tone="red" active={filter === 'problem'} onClick={() => setFilter('problem')} />
       </section>
