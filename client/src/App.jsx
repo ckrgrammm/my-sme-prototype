@@ -10,13 +10,20 @@ import DetailScreen from './components/DetailScreen.jsx';
 import FieldScreen from './components/FieldScreen.jsx';
 import MonthlyScreen from './components/MonthlyScreen.jsx';
 import MoreScreen from './components/MoreScreen.jsx';
+import WorkflowScreen from './components/WorkflowScreen.jsx';
 import { DispatchModal, SwitcherModal } from './components/Modals.jsx';
 
 const DEFAULT_INDUSTRY = 'workshop';
 
 export default function App() {
   const [industries, setIndustries] = useState([]);
-  const [industry, setIndustry] = useState(DEFAULT_INDUSTRY);
+  // 行业必须在首次渲染前就同步定好，不能等 effect 里再纠正 —
+  // 否则默认行业和 ?industry= 会各自触发一次 fetch，谁的响应后到就覆盖谁，偶发地把
+  // ?industry= 的结果冲掉（曾经真实发生：URL 已经是 supplier，界面却渲染成默认的 lorry）
+  const [industry, setIndustry] = useState(() => {
+    const qIndustry = new URLSearchParams(location.search).get('industry');
+    return qIndustry || DEFAULT_INDUSTRY;
+  });
   const [cfg, setCfg] = useState(null);
   const [loadError, setLoadError] = useState(null);
   const [view, setView] = useState('home');
@@ -27,6 +34,15 @@ export default function App() {
   const [lang, setLang] = useState(() => localStorage.getItem('sme_lang') || 'zh');
   const [role, setRole] = useState(() => localStorage.getItem('sme_role') || 'admin');
   const [navSide, setNavSide] = useState(() => localStorage.getItem('sme_navside') || 'left');
+  const [branding, setBranding] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('sme_branding')) || {}; }
+    catch { return {}; }
+  });
+
+  const updateBranding = (next) => {
+    setBranding(next);
+    localStorage.setItem('sme_branding', JSON.stringify(next));
+  };
 
   const toggleNavSide = () => {
     const next = navSide === 'left' ? 'right' : 'left';
@@ -50,18 +66,10 @@ export default function App() {
     setDispatchOrderId(null);
   };
 
-  // 启动：拉取行业列表，并读取锁定的行业 / URL 参数
+  // 启动：拉取行业列表；industry 本身已在上面的 useState 初始化时同步定好，这里只需持久化
   useEffect(() => {
     api.getIndustries().then(setIndustries).catch((e) => setLoadError(e.message));
-    const params = new URLSearchParams(location.search);
-    const qIndustry = params.get('industry');
-    if (qIndustry) {
-      localStorage.setItem('sme_industry', qIndustry);
-      setIndustry(qIndustry);
-    } else {
-      localStorage.setItem('sme_industry', DEFAULT_INDUSTRY);
-      setIndustry(DEFAULT_INDUSTRY);
-    }
+    localStorage.setItem('sme_industry', industry);
   }, []);
 
   const refreshCfg = useCallback((key) => {
@@ -145,12 +153,13 @@ export default function App() {
 
   const isStaff = role === 'staff';
   const showDetail = !isStaff && !!detailOrderId;
-  const navPad = isStaff ? '' : navSide === 'right' ? 'md:pr-[232px]' : 'md:pl-[232px]';
+  const navPad = isStaff ? '' : navSide === 'right' ? 'md:pr-[248px]' : 'md:pl-[248px]';
 
   return (
     <div className={cn('relative flex min-h-screen flex-col bg-background', navPad)}>
       <TopBar
         cfg={cfg}
+        branding={branding}
         showBack={showDetail}
         onBack={() => setDetailOrderId(null)}
         onLongPress={() => setShowSwitcher(true)}
@@ -161,19 +170,21 @@ export default function App() {
         navSide={navSide}
         onToggleNavSide={toggleNavSide}
       />
-      <div className="mx-auto w-full max-w-[1180px] flex-1 px-4 py-5 md:px-8 md:py-7 lg:px-10">
+      <div className="mx-auto w-full max-w-[1240px] flex-1 px-4 py-6 md:px-10 md:py-9 lg:px-12">
         {isStaff && <FieldScreen cfg={cfg} onAdvance={handleAdvance} lang={lang} />}
         {!isStaff && showDetail && <DetailScreen cfg={cfg} orderId={detailOrderId} lang={lang} />}
         {!isStaff && !showDetail && view === 'home' && (
-          <HomeScreen cfg={cfg} onOpen={setDetailOrderId} onDispatch={setDispatchOrderId} lang={lang} />
+          <HomeScreen cfg={cfg} onOpen={setDetailOrderId} onNavigate={setView} lang={lang} />
         )}
+        {!isStaff && !showDetail && view === 'workflow' && <WorkflowScreen lang={lang} industry={industry} onToast={showToast} />}
         {!isStaff && !showDetail && view === 'field' && <FieldScreen cfg={cfg} onAdvance={handleAdvance} lang={lang} />}
         {!isStaff && !showDetail && view === 'monthly' && <MonthlyScreen cfg={cfg} lang={lang} />}
-        {!isStaff && !showDetail && view === 'more' && <MoreScreen cfg={cfg} lang={lang} />}
+        {!isStaff && !showDetail && view === 'more' && <MoreScreen cfg={cfg} lang={lang} branding={branding} onBrandingChange={updateBranding} />}
       </div>
       {!isStaff && !showDetail && (
         <BottomNav
           cfg={cfg}
+          branding={branding}
           view={view}
           onTab={(tab) => { setView(tab); setDetailOrderId(null); }}
           lang={lang}
