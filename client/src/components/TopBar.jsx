@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { pick, t } from '../i18n.js';
 
-export default function TopBar({ cfg, showBack, onBack, onLongPress, lang, onToggleLang, role, onToggleRole }) {
+export default function TopBar({ cfg, branding = {}, showBack, onBack, onLongPress, lang, onToggleLang, role, onToggleRole }) {
   const timer = useRef(null);
   const start = () => { timer.current = setTimeout(onLongPress, 700); };
   const end = () => clearTimeout(timer.current);
@@ -12,7 +12,7 @@ export default function TopBar({ cfg, showBack, onBack, onLongPress, lang, onTog
           {showBack ? (
             <button className="header-icon" onClick={onBack}>‹</button>
           ) : (
-            <div className="brand-mark">{cfg.emoji}</div>
+            <div className="brand-mark">{branding.logo ? <img src={branding.logo} alt="" className="h-full w-full rounded-xl object-cover" /> : cfg.emoji}</div>
           )}
           <div
             className="min-w-0 select-none"
@@ -23,10 +23,10 @@ export default function TopBar({ cfg, showBack, onBack, onLongPress, lang, onTog
             onMouseLeave={end}
           >
             <div className="truncate text-base font-extrabold tracking-tight text-foreground md:text-lg">
-              {showBack ? t(lang, 'detailTitle', pick(lang, cfg.orderLabel)) : cfg.productName}
+              {showBack ? t(lang, 'detailTitle', pick(lang, cfg.orderLabel)) : (branding.name || cfg.productName)}
             </div>
             {!showBack && (
-              <div className="truncate text-[11px] font-medium text-muted-foreground">{pick(lang, cfg.name)} · Johor Bahru</div>
+              <div className="truncate text-[11px] font-medium text-muted-foreground">{branding.subtitle || `${pick(lang, cfg.name)} · Johor Bahru`}</div>
             )}
           </div>
         </div>
