@@ -19,4 +19,9 @@ export const api = {
     req(`/${key}/dispatch`, { method: 'POST', body: JSON.stringify({ orderId, resourceId }) }),
   advanceTask: (key, taskId) =>
     req(`/${key}/tasks/${taskId}/advance`, { method: 'POST' }),
+  getWorkflow: (key) => req(`/${key}/workflow`),
+  createWorkflowRequest: (key, request) =>
+    req(`/${key}/workflow/requests`, { method: 'POST', body: JSON.stringify(request) }),
+  advanceWorkflow: (key, itemId) =>
+    req(`/${key}/workflow/${itemId}/advance`, { method: 'POST' }),
 };
