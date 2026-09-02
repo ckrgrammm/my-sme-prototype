@@ -11,8 +11,8 @@ export default function MonthlyScreen({ cfg, lang }) {
 
   return (
     <>
-      <Card className="mb-4 p-4.5">
-        <h4 className="mb-3.5 text-sm font-extrabold text-foreground">{t(lang, 'monthlyChartTitle', resourceLabel)}</h4>
+      <Card className="mb-6 p-5 md:p-7">
+        <h4 className="mb-5 text-sm font-extrabold text-foreground">{t(lang, 'monthlyChartTitle', resourceLabel)}</h4>
         <div className="flex h-[150px] items-end gap-2">
           {rows.map((r) => {
             const h = Math.max(6, Math.round((r.revenue / maxRevenue) * 130));
@@ -31,21 +31,21 @@ export default function MonthlyScreen({ cfg, lang }) {
         <table className="w-full min-w-[440px] border-collapse text-xs">
           <thead>
             <tr>
-              <th className="bg-secondary px-1.5 py-2.5 text-left text-[11px] font-semibold text-secondary-foreground first:rounded-tl-2xl last:rounded-tr-2xl">{resourceLabel}</th>
-              <th className="bg-secondary px-1.5 py-2.5 text-left text-[11px] font-semibold text-secondary-foreground">{t(lang, 'thCount')}</th>
-              <th className="bg-secondary px-1.5 py-2.5 text-left text-[11px] font-semibold text-secondary-foreground">{t(lang, 'thRevenue')}</th>
-              <th className="bg-secondary px-1.5 py-2.5 text-left text-[11px] font-semibold text-secondary-foreground">{t(lang, 'thCost')}</th>
-              <th className="bg-secondary px-1.5 py-2.5 text-left text-[11px] font-semibold text-secondary-foreground">{t(lang, 'thNet')}</th>
+              <th className="bg-secondary px-4 py-3.5 text-left text-[11px] font-semibold text-secondary-foreground first:rounded-tl-2xl last:rounded-tr-2xl md:px-6">{resourceLabel}</th>
+              <th className="bg-secondary px-4 py-3.5 text-left text-[11px] font-semibold text-secondary-foreground md:px-6">{t(lang, 'thCount')}</th>
+              <th className="bg-secondary px-4 py-3.5 text-left text-[11px] font-semibold text-secondary-foreground md:px-6">{t(lang, 'thRevenue')}</th>
+              <th className="bg-secondary px-4 py-3.5 text-left text-[11px] font-semibold text-secondary-foreground md:px-6">{t(lang, 'thCost')}</th>
+              <th className="bg-secondary px-4 py-3.5 text-left text-[11px] font-semibold text-secondary-foreground md:px-6">{t(lang, 'thNet')}</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => (
               <tr key={r.code} className="border-b border-border last:border-0">
-                <td className="px-1.5 py-2 text-foreground">{r.code}<br /><span className="text-[11px] text-muted-foreground">{staffLabel} {r.staff}</span></td>
-                <td className="px-1.5 py-2 text-right font-bold text-foreground">{r.count}</td>
-                <td className="px-1.5 py-2 text-right font-bold text-foreground">{fmtMoney(r.revenue)}</td>
-                <td className="px-1.5 py-2 text-right font-bold text-foreground">{fmtMoney(r.cost)}</td>
-                <td className="px-1.5 py-2 text-right font-bold text-foreground">{fmtMoney(r.revenue - r.cost)}</td>
+                <td className="px-4 py-3 text-foreground md:px-6">{r.code}<br /><span className="text-[11px] text-muted-foreground">{staffLabel} {r.staff}</span></td>
+                <td className="px-4 py-3 text-right font-bold text-foreground md:px-6">{r.count}</td>
+                <td className="px-4 py-3 text-right font-bold text-foreground md:px-6">{fmtMoney(r.revenue)}</td>
+                <td className="px-4 py-3 text-right font-bold text-foreground md:px-6">{fmtMoney(r.cost)}</td>
+                <td className="px-4 py-3 text-right font-bold text-foreground md:px-6">{fmtMoney(r.revenue - r.cost)}</td>
               </tr>
             ))}
           </tbody>
@@ -53,7 +53,7 @@ export default function MonthlyScreen({ cfg, lang }) {
       </div>
       <div className="mb-4 mr-0.5 text-right text-[11px] text-muted-foreground md:hidden">{t(lang, 'tableHint')}</div>
 
-      <Card className="bg-secondary p-4.5 text-secondary-foreground">
+      <Card className="bg-secondary p-5 text-secondary-foreground md:p-6">
         <div className="flex items-center justify-between border-b border-white/10 py-2">
           <div className="text-[13px] text-white/60">{t(lang, 'totalRevenue')}</div>
           <div className="text-lg font-extrabold">{fmtMoney(totalRevenue)}</div>

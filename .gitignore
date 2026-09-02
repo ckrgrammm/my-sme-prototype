@@ -6,7 +6,8 @@ client/dist/
 
 .env
 .env.*
+!.env.example
+!server/.env.example
 *.log
 
 .DS_Store
-
