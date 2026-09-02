@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
+import { api } from '../api.js';
 import { pick, t } from '../i18n.js';
 import Card from './ui/Card.jsx';
 import Switch from './ui/Switch.jsx';
@@ -30,7 +31,7 @@ function AutoCard({ a, lang }) {
   }
 
   return (
-    <Card className="mb-3 p-4">
+    <Card className="mb-3 p-5 md:p-6">
       <div className="flex items-center justify-between gap-2.5">
         <div>
           <div className="text-sm font-extrabold text-foreground">{pick(lang, a.title)}</div>
@@ -41,6 +42,29 @@ function AutoCard({ a, lang }) {
       {on && <div className="mt-3 rounded-lg bg-muted p-2.5 text-[12.5px] text-foreground">{preview}</div>}
     </Card>
   );
+}
+
+function BrandingCard({ cfg, lang, branding, onChange }) {
+  const [draft, setDraft] = useState(branding);
+  const [saved, setSaved] = useState(false);
+  const [whatsappReady, setWhatsappReady] = useState(false);
+  useEffect(() => { api.getWhatsappStatus().then((result) => setWhatsappReady(result.configured)).catch(() => {}); }, []);
+  const update = (key) => (event) => setDraft((value) => ({ ...value, [key]: event.target.value }));
+  const uploadLogo = (event) => {
+    const file = event.target.files?.[0];
+    if (!file || file.size > 1024 * 1024) return;
+    const reader = new FileReader();
+    reader.onload = () => setDraft((value) => ({ ...value, logo: reader.result }));
+    reader.readAsDataURL(file);
+  };
+  const save = () => { onChange(draft); setSaved(true); setTimeout(() => setSaved(false), 1800); };
+  return <section className="mb-8">
+    <div className="mb-3"><div className="section-eyebrow">{lang === 'zh' ? '公司设置' : 'COMPANY SETTINGS'}</div><h2 className="mt-1 text-lg font-extrabold">{lang === 'zh' ? '品牌与 WhatsApp' : 'Branding & WhatsApp'}</h2></div>
+    <Card className="p-5 md:p-6"><div className="grid gap-5 lg:grid-cols-[1fr_auto]">
+      <div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-bold text-muted-foreground">{lang === 'zh' ? '公司名称' : 'Company name'}<input value={draft.name || ''} onChange={update('name')} placeholder={cfg.productName} className="mt-1.5 w-full rounded-xl border bg-white px-4 py-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/20" /></label><label className="text-xs font-bold text-muted-foreground">{lang === 'zh' ? '公司简介／地点' : 'Subtitle / location'}<input value={draft.subtitle || ''} onChange={update('subtitle')} placeholder={`${pick(lang,cfg.name)} · Johor Bahru`} className="mt-1.5 w-full rounded-xl border bg-white px-4 py-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/20" /></label><label className="text-xs font-bold text-muted-foreground sm:col-span-2">{lang === 'zh' ? '公司 WhatsApp 电话（含国家码）' : 'Company WhatsApp number (with country code)'}<input value={draft.whatsapp || ''} onChange={update('whatsapp')} placeholder="60123456789" className="mt-1.5 w-full rounded-xl border bg-white px-4 py-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/20" /></label></div>
+      <div className="flex items-center gap-3 lg:flex-col"><div className="brand-mark !h-14 !w-14">{draft.logo ? <img src={draft.logo} alt="Logo preview" className="h-full w-full rounded-xl object-cover" /> : cfg.emoji}</div><label className="cursor-pointer text-xs font-extrabold text-primary">{lang === 'zh' ? '上传标志' : 'Upload logo'}<input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={uploadLogo} /></label></div>
+    </div><div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t pt-4"><div className="text-xs text-muted-foreground"><span className={`mr-2 inline-block h-2 w-2 rounded-full ${whatsappReady ? 'bg-success' : 'bg-amber-500'}`} />{whatsappReady ? (lang === 'zh' ? 'WhatsApp Business API 已连接' : 'WhatsApp Business API connected') : (lang === 'zh' ? 'WhatsApp 电话链接可用；Business API 等待服务器凭证' : 'WhatsApp link ready; Business API awaits server credentials')}</div><Button size="sm" onClick={save}>{saved ? '✓' : (lang === 'zh' ? '保存设置' : 'Save settings')}</Button></div></Card>
+  </section>;
 }
 
 /* =====================================================================
@@ -102,7 +126,7 @@ function validateAndDedupe(rows, cfg, lang) {
   });
 }
 
-export default function MoreScreen({ cfg, lang }) {
+export default function MoreScreen({ cfg, lang, branding = {}, onBrandingChange = () => {} }) {
   const fileInputRef = useRef(null);
   const [parsing, setParsing] = useState(false);
   const [parseError, setParseError] = useState(null);
@@ -173,12 +197,16 @@ export default function MoreScreen({ cfg, lang }) {
   };
 
   return (
-    <>
-      <h2 className="mb-2.5 text-sm font-extrabold text-foreground">{t(lang, 'autoTitle')}</h2>
+    <div className="space-y-8">
+      <BrandingCard cfg={cfg} lang={lang} branding={branding} onChange={onBrandingChange} />
+      <section>
+      <h2 className="mb-3 text-base font-extrabold text-foreground">{t(lang, 'autoTitle')}</h2>
       {cfg.automations.map((a, i) => <AutoCard key={i} a={a} lang={lang} />)}
+      </section>
 
-      <h2 className="mb-2.5 mt-6 text-sm font-extrabold text-foreground">{t(lang, 'importTitle')}</h2>
-      <Card className="mb-4 p-4.5">
+      <section>
+      <h2 className="mb-3 text-base font-extrabold text-foreground">{t(lang, 'importTitle')}</h2>
+      <Card className="mb-4 p-5 md:p-6">
         <h4 className="mb-1.5 text-[15px] font-extrabold text-foreground">{t(lang, 'importCardTitle')}</h4>
         <p className="mb-3.5 text-[12.5px] text-muted-foreground">{t(lang, 'importCardDesc', resourceLabel)}</p>
         <Button variant="outline" className="w-full" onClick={downloadTemplate}>{t(lang, 'downloadTemplate')}</Button>
@@ -271,6 +299,7 @@ export default function MoreScreen({ cfg, lang }) {
           </div>
         )}
       </Card>
-    </>
+      </section>
+    </div>
   );
 }
