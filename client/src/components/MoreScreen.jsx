@@ -138,8 +138,12 @@ export default function MoreScreen({ cfg, lang }) {
     setResults(null);
     setImportedCount(null);
     try {
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: 'array' });
+      const isCsv = /\.csv$/i.test(file.name) || file.type === 'text/csv';
+      // CSV 当纯文本读取并显式以 UTF-8 解码，避免中文栏位在没有 BOM 时被误判成其他编码变乱码；
+      // .xlsx/.xls 是二进制压缩格式，仍需用 ArrayBuffer 读取
+      const wb = isCsv
+        ? XLSX.read(await file.text(), { type: 'string' })
+        : XLSX.read(await file.arrayBuffer(), { type: 'array' });
       const rows = parseRows(wb);
       if (!rows.length) {
         setParseError(t(lang, 'importEmptyFile'));
