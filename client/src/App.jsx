@@ -10,11 +10,14 @@ import DetailScreen from './components/DetailScreen.jsx';
 import FieldScreen from './components/FieldScreen.jsx';
 import MonthlyScreen from './components/MonthlyScreen.jsx';
 import MoreScreen from './components/MoreScreen.jsx';
+import WorkflowScreen from './components/WorkflowScreen.jsx';
 import { DispatchModal, SwitcherModal } from './components/Modals.jsx';
+
+const DEFAULT_INDUSTRY = 'lorry';
 
 export default function App() {
   const [industries, setIndustries] = useState([]);
-  const [industry, setIndustry] = useState(null);
+  const [industry, setIndustry] = useState(DEFAULT_INDUSTRY);
   const [cfg, setCfg] = useState(null);
   const [loadError, setLoadError] = useState(null);
   const [view, setView] = useState('home');
@@ -53,12 +56,12 @@ export default function App() {
     api.getIndustries().then(setIndustries).catch((e) => setLoadError(e.message));
     const params = new URLSearchParams(location.search);
     const qIndustry = params.get('industry');
-    const saved = localStorage.getItem('sme_industry');
     if (qIndustry) {
       localStorage.setItem('sme_industry', qIndustry);
       setIndustry(qIndustry);
-    } else if (saved) {
-      setIndustry(saved);
+    } else {
+      localStorage.setItem('sme_industry', DEFAULT_INDUSTRY);
+      setIndustry(DEFAULT_INDUSTRY);
     }
   }, []);
 
@@ -165,6 +168,7 @@ export default function App() {
         {!isStaff && !showDetail && view === 'home' && (
           <HomeScreen cfg={cfg} onOpen={setDetailOrderId} onDispatch={setDispatchOrderId} lang={lang} />
         )}
+        {!isStaff && !showDetail && view === 'workflow' && <WorkflowScreen lang={lang} industry={industry} onToast={showToast} />}
         {!isStaff && !showDetail && view === 'field' && <FieldScreen cfg={cfg} onAdvance={handleAdvance} lang={lang} />}
         {!isStaff && !showDetail && view === 'monthly' && <MonthlyScreen cfg={cfg} lang={lang} />}
         {!isStaff && !showDetail && view === 'more' && <MoreScreen cfg={cfg} lang={lang} />}
