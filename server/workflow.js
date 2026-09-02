@@ -99,6 +99,49 @@ const WORKFLOWS = {
       reported: bi('款项已核对，报表已更新', 'Payment matched · reports updated'),
     },
   },
+
+  tuition: {
+    fieldLabels: { route: bi('上课时间', 'Preferred class time'), cargo: bi('科目与套餐', 'Subject & package') },
+    stages: [
+      ['request', bi('咨询 / 试听申请', 'Inquiry / trial request')],
+      ['trial', bi('试听已排', 'Trial scheduled')],
+      ['confirmed', bi('确认报名', 'Enrolled')],
+      ['scheduled', bi('排班定课', 'Scheduled')],
+      ['active', bi('上课中', 'In session')],
+      ['completed', bi('课程完成', 'Package complete')],
+      ['invoicing', bi('开发票', 'Invoicing')],
+      ['payment', bi('收款', 'Payment')],
+      ['reported', bi('已入账', 'Reported')],
+    ],
+    idPrefix: 'REQ',
+    sequence: 330,
+    items: [
+      { id: 'REQ-3301', customer: 'Puan Zaleha（Aiman 家长）', phone: '+60 12-334 5567', route: '想找晚上 19:00–21:00 时段', cargo: 'PT3 数学 8 堂套餐', amount: 0, stage: 'request', source: 'WhatsApp', automation: bi('正在核实老师时段与报价', 'Checking tutor availability and preparing quote'), needsAttention: true, age: '5 min' },
+      { id: 'REQ-3302', customer: 'Mr. Tan（Chloe 家长）', phone: '+60 17-660 2281', route: '周六 10:00–12:00', cargo: 'IGCSE 数学 10 堂套餐', amount: 650, stage: 'trial', source: 'WhatsApp', automation: bi('试听课已安排，周六 10:00', 'Trial class scheduled for Saturday 10:00'), needsApproval: true, age: '18 min' },
+      { id: 'ENR-3303', customer: 'Mrs. Wong（Ethan 家长）', phone: '+60 19-223 4410', route: '周三 20:00–21:30', cargo: 'SPM 物理 8 堂套餐', amount: 520, stage: 'confirmed', source: 'Web form', automation: bi('家长已确认报名，课程档案建立中', 'Parent confirmed enrollment · profile being set up'), age: '30 min' },
+      { id: 'ENR-3304', customer: 'En. Rashid（Iman 家长）', phone: '+60 13-882 7754', route: '周一 / 三 17:00–18:00', cargo: 'UPSR 科学 12 堂套餐', amount: 540, stage: 'scheduled', source: 'Recurring', automation: bi('已分配线上教室与老师，等待首堂课确认', 'Virtual classroom and tutor assigned · awaiting first session confirmation'), needsAttention: true, age: '45 min' },
+      { id: 'ENR-3305', customer: 'Mdm Lee（Xin Yi 家长）', phone: '+60 16-773 1120', route: '周二 / 四 18:00–19:30', cargo: 'PT3 国文 8 堂套餐', amount: 400, stage: 'active', source: 'WhatsApp', automation: bi('已上课 3/8 堂，进度正常', '3 of 8 sessions completed · on track'), age: '1 hr' },
+      { id: 'ENR-3306', customer: 'Mr. Kumar（Aditya 家长）', phone: '+60 12-556 8890', route: '周五 20:00–21:30', cargo: 'SPM 生物 8 堂套餐', amount: 480, stage: 'completed', source: 'Recurring', automation: bi('8 堂课程已完成，等待家长续费决定', 'All 8 sessions completed · awaiting renewal decision'), needsAttention: true, age: '2 hr' },
+      { id: 'INV-3307', customer: 'Puan Farida（Nabil 家长）', phone: '+60 11-990 3345', route: '周六 14:00–15:30', cargo: 'SPM 化学 8 堂套餐', amount: 520, stage: 'invoicing', source: 'WhatsApp', automation: bi('课程已完成，发票已生成', 'Package completed · invoice generated'), age: '3 hr' },
+      { id: 'INV-3308', customer: 'Mr. Ong（Kai Xuan 家长）', phone: '+60 17-224 6690', route: '周三 19:00–20:30', cargo: 'IGCSE 英文 10 堂套餐', amount: 700, stage: 'payment', source: 'Recurring', automation: bi('学费已逾期，账期 12 天', 'Tuition fee overdue · 12 days past due'), needsAttention: true, age: '2 days' },
+    ],
+    events: [
+      { id: 1, time: '10:18', text: bi('已发送 Zoom 链接提醒 ENR-3305', 'Zoom link reminder sent for ENR-3305'), type: 'message' },
+      { id: 2, time: '10:12', text: bi('ENR-3304 老师与线上教室已确认', 'Tutor and virtual classroom confirmed for ENR-3304'), type: 'assignment' },
+      { id: 3, time: '09:58', text: bi('ENR-3303 家长已确认报名', 'Parent confirmed enrollment for ENR-3303'), type: 'payment' },
+      { id: 4, time: '09:42', text: bi('REQ-3302 试听课已安排', 'Trial class scheduled for REQ-3302'), type: 'request' },
+    ],
+    messages: {
+      trial: bi('试听课已安排，等待家长确认', 'Trial class scheduled · awaiting parent confirmation'),
+      confirmed: bi('家长已确认报名，课程档案建立中', 'Parent confirmed enrollment · profile being set up'),
+      scheduled: bi('已分配线上教室与老师，等待首堂课确认', 'Virtual classroom and tutor assigned · awaiting first session confirmation'),
+      active: bi('已开始上课，进度追踪中', 'Lessons underway · progress being tracked'),
+      completed: bi('课程套餐已用完，等待续费决定', 'Package sessions used up · awaiting renewal decision'),
+      invoicing: bi('课程已完成，发票已生成', 'Package completed · invoice generated'),
+      payment: bi('发票已寄出，账期追踪中', 'Invoice sent · monitoring due date'),
+      reported: bi('款项已核对，报表已更新', 'Payment matched · reports updated'),
+    },
+  },
 };
 
 function snapshot(industry) {
@@ -110,6 +153,7 @@ function snapshot(industry) {
     stages: data.stages.map(([key, label]) => ({ key, label })),
     items: data.items,
     events: data.events,
+    fieldLabels: data.fieldLabels || null,
     metrics: { attention, automated, automationRate: Math.round((automated / data.items.length) * 100), hoursSaved: 6.4 },
   };
 }

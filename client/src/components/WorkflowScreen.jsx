@@ -32,10 +32,13 @@ const stageIcons = {
   planning: '◫', assigned: '🚚', pickup: '↗', delivery: '➜',
   picking: '📦', packed: '✔', dispatched: '🚛', delivered: '➜',
   pod: '✍', invoicing: '▤', payment: 'RM', reported: '▥',
+  trial: '🎧', scheduled: '📅', active: '🎓', completed: '🏁',
 };
 
-function RequestForm({ lang, industry, onClose, onCreated }) {
+function RequestForm({ lang, industry, fieldLabels, onClose, onCreated }) {
   const c = copy[lang];
+  const routeLabel = fieldLabels?.route ? pick(lang, fieldLabels.route) : c.route;
+  const cargoLabel = fieldLabels?.cargo ? pick(lang, fieldLabels.cargo) : c.cargo;
   const [form, setForm] = useState({ customer: '', phone: '', route: '', cargo: '', amount: '', source: 'WhatsApp' });
   const [saving, setSaving] = useState(false);
   const set = (key) => (event) => setForm((value) => ({ ...value, [key]: event.target.value }));
@@ -51,8 +54,8 @@ function RequestForm({ lang, industry, onClose, onCreated }) {
         <div className="grid gap-3 sm:grid-cols-2">
           <input required value={form.customer} onChange={set('customer')} placeholder={c.customer} className="rounded-xl border bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
           <input required value={form.phone} onChange={set('phone')} placeholder={c.phone} className="rounded-xl border bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
-          <input required value={form.route} onChange={set('route')} placeholder={c.route} className="rounded-xl border bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 sm:col-span-2" />
-          <input required value={form.cargo} onChange={set('cargo')} placeholder={c.cargo} className="rounded-xl border bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
+          <input required value={form.route} onChange={set('route')} placeholder={routeLabel} className="rounded-xl border bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 sm:col-span-2" />
+          <input required value={form.cargo} onChange={set('cargo')} placeholder={cargoLabel} className="rounded-xl border bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
           <input type="number" min="0" value={form.amount} onChange={set('amount')} placeholder={c.amount} className="rounded-xl border bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
           <select value={form.source} onChange={set('source')} className="rounded-xl border bg-white px-4 py-3 text-sm sm:col-span-2"><option>WhatsApp</option><option>Phone</option><option>Web form</option><option>Recurring</option></select>
         </div>
@@ -103,7 +106,7 @@ export default function WorkflowScreen({ lang = 'en', industry, onToast }) {
       </section>
 
       <section className="rounded-2xl border bg-white p-4 md:p-5"><div className="section-eyebrow">LIVE LOG</div><h2 className="mt-1 text-lg font-extrabold">{c.activity}</h2><div className="mt-4 divide-y">{workflow.events.slice(0, 6).map((event) => <div key={event.id} className="flex gap-3 py-3 text-xs"><span className="font-bold text-muted-foreground">{event.time}</span><span className="font-semibold">{pick(lang, event.text)}</span></div>)}</div></section>
-      {creating && <RequestForm lang={lang} industry={industry} onClose={() => setCreating(false)} onCreated={setWorkflow} />}
+      {creating && <RequestForm lang={lang} industry={industry} fieldLabels={workflow.fieldLabels} onClose={() => setCreating(false)} onCreated={setWorkflow} />}
     </div>
   );
 }

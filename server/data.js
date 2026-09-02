@@ -258,4 +258,80 @@ CONFIG.supplier = {
   ],
 };
 
-export const INDUSTRY_ORDER = ['lorry', 'workshop', 'renovation', 'supplier'];
+/* =====================================================================
+   5. 补习中心 TUITION — Demo 深度
+   全线上教学：约束资源不是教室这类物理空间，而是并发的线上教室名额
+   （Zoom room license）与老师的可授课时数。订单不是一次性任务，而是
+   「今日课节」——每一堂课都挂着一份 package（学生报名的课程套餐），
+   剩余堂数与续费提醒是这个行业最独特、最真实的痛点。
+   ===================================================================== */
+CONFIG.tuition = {
+  key: 'tuition', name: bi('补习中心', 'Tuition Centre'), emoji: '🎓',
+  tagline: 'Online Class Tracker',
+  productName: 'ClassOps', orderCode: 'CL',
+  resourceLabel: bi('线上教室', 'Virtual Classroom'), staffLabel: bi('老师', 'Tutor'), orderLabel: bi('课节', 'Class Session'),
+  stageLabels: { pending: bi('待上课', 'Upcoming'), active: bi('上课中', 'In Session'), done: bi('已完成', 'Completed') },
+  fieldRole: bi('老师', 'Tutor'),
+  resources: [
+    { id: 'TC1', code: '线上教室 1', staff: 'Ah Seng', status: 'active', skill: bi('SPM 附加数学专长', 'SPM Add Math specialist'), skillLevel: 4, restHours: 2 },
+    { id: 'TC2', code: '线上教室 2', staff: 'Muthu', status: 'active', skill: bi('PT3 理科专长', 'PT3 Science specialist'), skillLevel: 3, restHours: 3 },
+    { id: 'TC3', code: '线上教室 3', staff: 'Azman', status: 'idle', skill: bi('UPSR 全科', 'UPSR all subjects'), skillLevel: 2, restHours: 9 },
+    { id: 'TC4', code: '线上教室 4', staff: 'Lim', status: 'problem', skill: bi('SPM 附加数学专长', 'SPM Add Math specialist'), skillLevel: 4, restHours: 1 },
+    { id: 'TC5', code: '线上教室 5', staff: 'Rajesh', status: 'active', skill: bi('IGCSE 英文专长', 'IGCSE English specialist'), skillLevel: 3, restHours: 2 },
+    { id: 'TC6', code: '线上教室 6', staff: 'Faizal', status: 'idle', skill: bi('SPM 化学专长', 'SPM Chemistry specialist'), skillLevel: 5, restHours: 11 },
+    { id: 'TC7', code: '线上教室 7', staff: 'Tan', status: 'active', skill: bi('UPSR 全科', 'UPSR all subjects'), skillLevel: 3, restHours: 4 },
+    { id: 'TC8', code: '线上教室 8', staff: 'Kumar', status: 'idle', skill: bi('PT3 理科专长', 'PT3 Science specialist'), skillLevel: 2, restHours: 5 },
+  ],
+  packages: [
+    { id: 'P01', student: 'Wei Jie · SPM Form 5', subject: bi('SPM 附加数学', 'SPM Additional Mathematics'), schedule: bi('每周二 / 四 19:00–21:00', 'Tue & Thu, 19:00–21:00'), totalSessions: 8, sessionsUsed: 7, fee: 480 },
+    { id: 'P02', student: 'Aisyah · UPSR Std 6', subject: bi('UPSR 国文', 'UPSR Bahasa Malaysia'), schedule: bi('每周一 / 三 17:00–18:00', 'Mon & Wed, 17:00–18:00'), totalSessions: 12, sessionsUsed: 4, fee: 540 },
+    { id: 'P03', student: 'Kavya · SPM Form 5', subject: bi('SPM 附加数学加强班', 'SPM Add Math intensive'), schedule: bi('每周二 / 四 19:00–21:00', 'Tue & Thu, 19:00–21:00'), totalSessions: 10, sessionsUsed: 5, fee: 600 },
+    { id: 'P04', student: 'Danial · PT3 Form 3', subject: bi('PT3 科学', 'PT3 Science'), schedule: bi('每周一 / 三 18:00–19:30', 'Mon & Wed, 18:00–19:30'), totalSessions: 8, sessionsUsed: 3, fee: 400 },
+    { id: 'P05', student: 'Mei Ling · IGCSE Year 10', subject: bi('IGCSE 英文', 'IGCSE English'), schedule: bi('每周五 20:00–21:30', 'Fri, 20:00–21:30'), totalSessions: 10, sessionsUsed: 9, fee: 700 },
+    { id: 'P06', student: 'Farah · UPSR Std 6', subject: bi('UPSR 全科精读', 'UPSR all-subjects revision'), schedule: bi('每周六 10:00–12:00', 'Sat, 10:00–12:00'), totalSessions: 12, sessionsUsed: 6, fee: 660 },
+    { id: 'P07', student: 'Justin · PT3 Form 3', subject: bi('PT3 国文', 'PT3 Bahasa Malaysia'), schedule: bi('每周一 / 三 18:00–19:30', 'Mon & Wed, 18:00–19:30'), totalSessions: 8, sessionsUsed: 8, fee: 400 },
+    { id: 'P08', student: 'Nur Hidayah · SPM Form 5', subject: bi('SPM 化学', 'SPM Chemistry'), schedule: bi('每周二 20:00–21:30', 'Tue, 20:00–21:30'), totalSessions: 8, sessionsUsed: 6, fee: 520 },
+    { id: 'P09', student: 'Chen Wei · PT3 Form 3', subject: bi('PT3 科学', 'PT3 Science'), schedule: bi('每周四 18:00–19:30', 'Thu, 18:00–19:30'), totalSessions: 10, sessionsUsed: 7, fee: 500 },
+    { id: 'P10', student: 'Siti Nur · SPM Form 5', subject: bi('SPM 附加数学', 'SPM Additional Mathematics'), schedule: bi('每周二 / 四 19:00–21:00', 'Tue & Thu, 19:00–21:00'), totalSessions: 8, sessionsUsed: 4, fee: 480 },
+    { id: 'P11', student: 'Ravin · PT3 Form 3', subject: bi('PT3 科学', 'PT3 Science'), schedule: bi('每周二 18:00–19:30', 'Tue, 18:00–19:30'), totalSessions: 8, sessionsUsed: 8, fee: 400 },
+    { id: 'P12', student: 'Hafiz · UPSR Std 6', subject: bi('UPSR 数学', 'UPSR Mathematics'), schedule: bi('每周五 17:00–18:00', 'Fri, 17:00–18:00'), totalSessions: 12, sessionsUsed: 0, fee: 540 },
+  ],
+  orders: [
+    { id: 'T01', customer: 'Wei Jie · SPM Form 5', route: '19:00–21:00', content: bi('SPM 附加数学 · 第 7/8 堂 · 剩 1 堂', 'SPM Add Math · Session 7/8 · 1 left'), amount: 60, status: 'problem', resourceId: 'TC4', packageId: 'P01', problemNote: bi('网络连线中断，老师正在重新连线，学生在线等待', 'Connection dropped mid-class, tutor reconnecting, student waiting online'), timeline: genTimeline('problem', 19, 5) },
+    { id: 'T02', customer: 'Aisyah · UPSR Std 6', route: '17:00–18:00', content: bi('UPSR 国文 · 第 5/12 堂', 'UPSR Bahasa Malaysia · Session 5/12'), amount: 45, status: 'pending', packageId: 'P02', timeline: genTimeline('pending', 17, 0) },
+    { id: 'T03', customer: 'Kavya · SPM Form 5', route: '19:00–21:00', content: bi('SPM 附加数学加强班 · 第 6/10 堂', 'SPM Add Math intensive · Session 6/10'), amount: 60, status: 'active', resourceId: 'TC1', packageId: 'P03', timeline: genTimeline('active', 19, 0) },
+    { id: 'T04', customer: 'Danial · PT3 Form 3', route: '18:00–19:30', content: bi('PT3 科学 · 第 4/8 堂', 'PT3 Science · Session 4/8'), amount: 50, status: 'active', resourceId: 'TC2', packageId: 'P04', timeline: genTimeline('active', 18, 0) },
+    { id: 'T05', customer: 'Mei Ling · IGCSE Year 10', route: '20:00–21:30', content: bi('IGCSE 英文 · 第 10/10 堂 · 剩 1 堂', 'IGCSE English · Session 10/10 · 1 left'), amount: 70, status: 'active', resourceId: 'TC5', packageId: 'P05', timeline: genTimeline('active', 20, 0) },
+    { id: 'T06', customer: 'Farah · UPSR Std 6', route: '10:00–12:00', content: bi('UPSR 全科精读 · 第 7/12 堂', 'UPSR all-subjects revision · Session 7/12'), amount: 55, status: 'active', resourceId: 'TC7', packageId: 'P06', timeline: genTimeline('active', 10, 0) },
+    { id: 'T07', customer: 'Justin · PT3 Form 3', route: '18:00–19:30', content: bi('PT3 国文 · 第 8/8 堂 · 套餐已用完', 'PT3 Bahasa Malaysia · Session 8/8 · package complete'), amount: 50, status: 'done', paid: true, resourceId: 'TC3', packageId: 'P07', timeline: genTimeline('done', 18, 0) },
+    { id: 'T08', customer: 'Nur Hidayah · SPM Form 5', route: '20:00–21:30', content: bi('SPM 化学 · 第 6/8 堂', 'SPM Chemistry · Session 6/8'), amount: 65, status: 'done', paid: true, resourceId: 'TC6', packageId: 'P08', timeline: genTimeline('done', 20, 0) },
+    { id: 'T09', customer: 'Chen Wei · PT3 Form 3', route: '18:00–19:30', content: bi('PT3 科学 · 第 7/10 堂', 'PT3 Science · Session 7/10'), amount: 50, status: 'done', paid: false, resourceId: 'TC8', packageId: 'P09', timeline: genTimeline('done', 18, 0) },
+    { id: 'T10', customer: 'Siti Nur · SPM Form 5', route: '19:00–21:00', content: bi('SPM 附加数学 · 第 4/8 堂', 'SPM Additional Mathematics · Session 4/8'), amount: 60, status: 'done', paid: true, resourceId: 'TC1', packageId: 'P10', timeline: genTimeline('done', 19, 0) },
+    { id: 'T11', customer: 'Ravin · PT3 Form 3', route: '18:00–19:30', content: bi('PT3 科学 · 第 8/8 堂 · 套餐已用完', 'PT3 Science · Session 8/8 · package complete'), amount: 50, status: 'done', paid: false, resourceId: 'TC2', packageId: 'P11', timeline: genTimeline('done', 18, 0) },
+    { id: 'T12', customer: 'Hafiz · UPSR Std 6', route: '17:00–18:00', content: bi('UPSR 数学 · 首堂课', 'UPSR Mathematics · First session'), amount: 45, status: 'pending', packageId: 'P12', timeline: genTimeline('pending', 17, 0) },
+  ],
+  monthly: [
+    { code: '线上教室 1', staff: 'Ah Seng', count: 24, revenue: 5100, cost: 2200 },
+    { code: '线上教室 2', staff: 'Muthu', count: 20, revenue: 4200, cost: 1900 },
+    { code: '线上教室 3', staff: 'Azman', count: 16, revenue: 3100, cost: 1400 },
+    { code: '线上教室 4', staff: 'Lim', count: 14, revenue: 2900, cost: 1650 },
+    { code: '线上教室 5', staff: 'Rajesh', count: 18, revenue: 4500, cost: 1750 },
+    { code: '线上教室 6', staff: 'Faizal', count: 22, revenue: 5600, cost: 2400 },
+    { code: '线上教室 7', staff: 'Tan', count: 19, revenue: 3700, cost: 1600 },
+    { code: '线上教室 8', staff: 'Kumar', count: 15, revenue: 2800, cost: 1250 },
+  ],
+  unpaid: 640,
+  fieldTasks: [
+    { id: 'FT1', title: 'Wei Jie · SPM Form 5', loc: bi('附加数学 · 网络连线中', 'Add Math · reconnecting'), step: 1 },
+    { id: 'FT2', title: 'Aisyah · UPSR Std 6', loc: bi('Zoom 链接已发送，等待上课', 'Zoom link sent, awaiting start'), step: 0 },
+    { id: 'FT3', title: 'Justin · PT3 Form 3', loc: bi('课节已完成，套餐已用完待续费', 'Session complete, package used up — renewal needed'), step: 3 },
+  ],
+  automations: [
+    { title: bi('课程剩余堂数自动追踪 + 续费提醒', 'Auto session-balance tracking + renewal reminders'), pain: bi('不再靠人工数格子，堂数快用完自动通知家长续费', 'No more manually counting sessions — parents are auto-notified to renew before the package runs out'), preview: 'text', previewData: bi('⚠ Wei Jie（SPM 附加数学）仅剩 1 堂课，需提醒续费', '⚠ Wei Jie (SPM Add Math) has 1 session left — renewal reminder needed') },
+    { title: bi('Zoom 链接与上课提醒自动发送', 'Auto Zoom link + class reminders'), pain: bi('省掉每天手动传送几十个上课连结给家长', 'Saves manually sending dozens of class links to parents every day'), preview: 'wa', previewData: { text: bi('Wei Jie 您好，今晚 19:00 SPM 附加数学课节即将开始 🎓\nZoom 链接：meet.classops.my/r1\n老师：Ah Seng', "Hi Wei Jie, tonight's 19:00 SPM Add Math session starts soon 🎓\nZoom link: meet.classops.my/r1\nTutor: Ah Seng") } },
+    { title: bi('缺席自动通知家长', 'Auto absence notification to parents'), pain: bi('学生没上线，家长立刻收到通知，不必等月底才发现', 'Parents are notified the moment a student misses class, not discovered at month-end'), preview: 'wa', previewData: { text: bi('提醒：Aisyah 今晚 UPSR 国文课节未出席，已扣 1 堂', "Notice: Aisyah missed tonight's UPSR BM session — 1 session deducted") } },
+    { title: bi('月结 / 应收学费自动汇总', 'Auto monthly closing / tuition fee summary'), pain: bi('月底对账从翻 Excel 变成自动列表，欠费自动标红', 'Month-end reconciliation becomes an automatic list; overdue fees auto-flagged'), preview: 'text', previewData: bi('⚠ Chen Wei（PT3 科学）学费 RM 50 已逾期 4 天', '⚠ Chen Wei (PT3 Science) tuition fee RM 50 is 4 days overdue') },
+  ],
+};
+
+export const INDUSTRY_ORDER = ['lorry', 'workshop', 'renovation', 'supplier', 'tuition'];
