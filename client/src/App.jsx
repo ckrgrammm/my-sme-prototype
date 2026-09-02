@@ -17,7 +17,13 @@ const DEFAULT_INDUSTRY = 'supplier';
 
 export default function App() {
   const [industries, setIndustries] = useState([]);
-  const [industry, setIndustry] = useState(DEFAULT_INDUSTRY);
+  // 行业必须在首次渲染前就同步定好，不能等 effect 里再纠正 —
+  // 否则默认行业和 ?industry= 会各自触发一次 fetch，谁的响应后到就覆盖谁，偶发地把
+  // ?industry= 的结果冲掉（曾经真实发生：URL 已经是 supplier，界面却渲染成默认的 lorry）
+  const [industry, setIndustry] = useState(() => {
+    const qIndustry = new URLSearchParams(location.search).get('industry');
+    return qIndustry || DEFAULT_INDUSTRY;
+  });
   const [cfg, setCfg] = useState(null);
   const [loadError, setLoadError] = useState(null);
   const [view, setView] = useState('home');
@@ -51,18 +57,10 @@ export default function App() {
     setDispatchOrderId(null);
   };
 
-  // 启动：拉取行业列表，并读取锁定的行业 / URL 参数
+  // 启动：拉取行业列表；industry 本身已在上面的 useState 初始化时同步定好，这里只需持久化
   useEffect(() => {
     api.getIndustries().then(setIndustries).catch((e) => setLoadError(e.message));
-    const params = new URLSearchParams(location.search);
-    const qIndustry = params.get('industry');
-    if (qIndustry) {
-      localStorage.setItem('sme_industry', qIndustry);
-      setIndustry(qIndustry);
-    } else {
-      localStorage.setItem('sme_industry', DEFAULT_INDUSTRY);
-      setIndustry(DEFAULT_INDUSTRY);
-    }
+    localStorage.setItem('sme_industry', industry);
   }, []);
 
   const refreshCfg = useCallback((key) => {
