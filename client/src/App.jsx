@@ -10,6 +10,7 @@ import DetailScreen from './components/DetailScreen.jsx';
 import FieldScreen from './components/FieldScreen.jsx';
 import MonthlyScreen from './components/MonthlyScreen.jsx';
 import MoreScreen from './components/MoreScreen.jsx';
+import WorkflowScreen from './components/WorkflowScreen.jsx';
 import { DispatchModal, SwitcherModal } from './components/Modals.jsx';
 
 const DEFAULT_INDUSTRY = 'lorry';
@@ -167,6 +168,7 @@ export default function App() {
         {!isStaff && !showDetail && view === 'home' && (
           <HomeScreen cfg={cfg} onOpen={setDetailOrderId} onDispatch={setDispatchOrderId} lang={lang} />
         )}
+        {!isStaff && !showDetail && view === 'workflow' && <WorkflowScreen lang={lang} onToast={showToast} />}
         {!isStaff && !showDetail && view === 'field' && <FieldScreen cfg={cfg} onAdvance={handleAdvance} lang={lang} />}
         {!isStaff && !showDetail && view === 'monthly' && <MonthlyScreen cfg={cfg} lang={lang} />}
         {!isStaff && !showDetail && view === 'more' && <MoreScreen cfg={cfg} lang={lang} />}
