@@ -25,4 +25,7 @@ export const api = {
   advanceWorkflow: (key, itemId) =>
     req(`/${key}/workflow/${itemId}/advance`, { method: 'POST' }),
   getWhatsappStatus: () => req('/integrations/whatsapp/status'),
+  simulateWhatsapp: (key, phone, text) =>
+    req(`/${key}/whatsapp/simulate`, { method: 'POST', body: JSON.stringify({ phone, text }) }),
+  getAssistantAudit: (key) => req(`/${key}/assistant/audit`),
 };
