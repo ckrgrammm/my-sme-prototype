@@ -5,7 +5,8 @@
 import { bi } from '../industries/shared.js';
 import { getWorkflowStore } from '../workflow.js';
 import { logAudit } from './store.js';
-import { FIELD_ORDER, fieldByKey, isConfirmation, isHumanRequest, isNegative } from './tuitionIntake.js';
+import { FIELD_ORDER, fieldByKey, isConfirmation, isHumanRequest, isNegative, matchBilling, matchLevel, matchSubject } from './tuitionIntake.js';
+import { createTuitionPaymentRequest, reserveTuitionOffer } from './tuitionOperations.js';
 
 function detectLanguage(text) {
   return /[一-鿿]/.test(text) ? 'zh' : 'en';
@@ -15,9 +16,23 @@ function say(lang, zh, en) {
   return lang === 'zh' ? zh : en;
 }
 
-function findActiveItem(store, phone) {
-  const ACTIVE_STAGES = ['inquiry', 'details_collection', 'options_presented'];
-  return store.items.find((i) => i.phone === phone && ACTIVE_STAGES.includes(i.stage)) || null;
+function normalizePhone(phone) {
+  return String(phone || '').replace(/\D/g, '');
+}
+
+function prepareConversationItem(item) {
+  item.transcript ||= [];
+  item.collected ||= {};
+  item.missingField ||= null;
+  item.retryCount ||= 0;
+  item.confidence ??= null;
+  return item;
+}
+
+function findConversationItem(store, phone) {
+  const normalized = normalizePhone(phone);
+  const item = store.items.find((entry) => entry.source === 'WhatsApp' && normalizePhone(entry.phone) === normalized);
+  return item ? prepareConversationItem(item) : null;
 }
 
 function createInquiryItem(store, phone) {
@@ -56,8 +71,25 @@ function escalate(item, lang, reasonZh, reasonEn) {
     "Thanks for the message! I'll need one of our team members to help with this — they'll get back to you shortly.");
 }
 
+function cancelEnrolment(item, lang) {
+  item.stage = 'cancelled';
+  item.needsAttention = false;
+  item.missingField = null;
+  item.automation = bi('家长已取消此次报名', 'Parent cancelled this enrolment');
+  return say(lang, '好的，这次报名已取消。如需重新报名，请告诉我们。', 'No problem — this enrolment has been cancelled. Message us whenever you would like to start again.');
+}
+
 function nextMissingField(collected) {
   return FIELD_ORDER.find((f) => collected[f.key] === undefined);
+}
+
+function prefillFromOpeningMessage(message, collected) {
+  const level = matchLevel(message);
+  if (level?.label) collected.studentLevel = level;
+  const subject = level?.label ? matchSubject(message, level.label) : null;
+  if (subject) collected.subject = subject;
+  const billing = matchBilling(message);
+  if (billing && subject?.offers.some((offer) => offer.billingType === billing)) collected.billingPreference = billing;
 }
 
 // field.prompt / field.invalidReply 大多数是固定的 bi(zh,en)，但「科目」这一题
@@ -69,46 +101,61 @@ function resolveText(value, collected, lang) {
 }
 
 function describeSummary(collected, lang) {
-  const billingLabel = collected.billingPreference === 'package' ? say(lang, '月费套餐', 'monthly package') : say(lang, '按堂计费', 'pay-per-class');
+  const billingLabel = collected.billingPreference === 'monthly' ? say(lang, '按月付费', 'monthly') : say(lang, '按堂计费', 'pay-per-class');
   const subjectEntry = collected.subject;
-  const slot = subjectEntry.slots[0];
+  const offer = collected.selectedOffer;
+  const slot = offer.schedule;
+  const price = offer.billingType === 'monthly' ? `RM${offer.amount}/${say(lang, '月', 'month')}` : `RM${offer.amount}/${say(lang, '堂', 'class')}`;
   return say(lang,
-    `请确认以下资料：\n学生：${collected.studentName}\n家长：${collected.guardianName}\n年级：${collected.studentLevel.raw}\n科目：${subjectEntry.subject.zh}\n上课时间：${slot.zh}（线上）\n付费方式：${billingLabel}\n\n回复 CONFIRM 确认报名，或告诉我您想更改的部分。`,
-    `Please confirm these details:\nStudent: ${collected.studentName}\nGuardian: ${collected.guardianName}\nLevel: ${collected.studentLevel.raw}\nSubject: ${subjectEntry.subject.en}\nSchedule: ${slot.en} (online)\nBilling: ${billingLabel}\n\nReply CONFIRM to enrol, or tell me what you'd like to change.`);
-}
-
-function describeSubjectFee(subjectEntry, lang) {
-  const slot = subjectEntry.slots[0];
-  return say(lang,
-    `${subjectEntry.subject.zh}：${slot.zh}（线上）· RM${subjectEntry.feePerClass}/堂`,
-    `${subjectEntry.subject.en}: ${slot.en} (online) · RM${subjectEntry.feePerClass}/class`);
+    `请确认以下资料：\n学生：${collected.studentName}\n家长：${collected.guardianName}\n年级：${collected.studentLevel.raw}\n科目：${subjectEntry.subject.zh}\n上课时间：${slot.zh}（线上）\n付费方式：${billingLabel}\n费用：${price}\n\n回复 CONFIRM 确认报名，或回复 CANCEL 取消。`,
+    `Please confirm these details:\nStudent: ${collected.studentName}\nGuardian: ${collected.guardianName}\nLevel: ${collected.studentLevel.raw}\nSubject: ${subjectEntry.subject.en}\nSchedule: ${slot.en} (online)\nBilling: ${billingLabel}\nFee: ${price}\n\nReply CONFIRM to enrol, or CANCEL to stop.`);
 }
 
 function finalizeEnrolment(item, lang) {
   const { collected } = item;
   const subject = collected.subject.subject;
-  const slot = collected.subject.slots[0];
-  const billingLabel = collected.billingPreference === 'package' ? say(lang, '月费套餐', 'monthly package') : say(lang, '按堂计费', 'pay-per-class');
+  const offer = collected.selectedOffer;
+  const slot = offer.schedule;
+  const billingLabel = collected.billingPreference === 'monthly' ? say(lang, '按月付费', 'monthly') : say(lang, '按堂计费', 'pay-per-class');
 
   item.customer = `${collected.studentName} · ${collected.studentLevel.raw}`;
   item.route = lang === 'zh' ? slot.zh : slot.en;
   item.cargo = `${subject.zh} · ${billingLabel}`;
-  item.amount = collected.subject.feePerClass;
+  item.amount = offer.amount;
+  item.billingType = offer.billingType;
+  item.offerId = offer.id;
   item.stage = 'customer_confirmed';
   item.confidence = 0.95;
   item.automation = bi('家长已在 WhatsApp 回复确认，报名记录已自动建立', 'Parent replied CONFIRM on WhatsApp · enrolment auto-created');
 
-  // Stage 8（自动化）：预留名额与生成付款请求属于「配置后可自动执行」的动作
-  // （spec 第 9 节），这里视为已配置，直接自动推进经过 slot_reserved 到 payment_pending；
-  // 真正的收款确认目前没有接支付网关，停在这一步，交给职员在自动化面板手动
-  // 点「执行下一步」——和其它行业「收款」阶段的处理方式完全一致。
-  item.stage = 'payment_pending';
-  item.automation = bi('名额已预留，付款请求已生成，等待家长付款', 'Slot reserved · payment request generated · awaiting payment');
+  const reservation = reserveTuitionOffer({ enrolmentId: item.id, offer });
+  if (!reservation.ok) {
+    return escalate(item, lang, '所选时段已满', 'the selected class is full');
+  }
+  item.reservation = reservation.reservation;
+  item.stage = 'slot_reserved';
+  item.automation = bi('名额已预留，正在准备付款请求', 'Slot reserved · preparing payment request');
+
+  const payment = createTuitionPaymentRequest({ enrolmentId: item.id, amount: item.amount, billingType: item.billingType });
+  if (payment.ok) {
+    item.paymentRequest = payment.paymentRequest;
+    item.stage = 'payment_pending';
+    item.automation = bi('名额已预留，付款链接已生成，等待家长付款', 'Slot reserved · payment link generated · awaiting payment');
+  } else {
+    item.needsAttention = true;
+    item.automation = bi('名额已预留；付款系统未配置，需工作人员发送付款说明', 'Slot reserved; payment provider is not configured, so staff must send payment instructions');
+  }
 
   const ref = item.id;
+  const price = item.billingType === 'monthly' ? `RM${item.amount}/${say(lang, '月', 'month')}` : `RM${item.amount}/${say(lang, '堂', 'class')}`;
+  if (payment.ok) {
+    return say(lang,
+      `太好了，${collected.studentName} 的资料已确认！✅\n参考编号：${ref}\n${subject.zh} · ${slot.zh}（线上）· ${price}\n付款链接：${payment.paymentRequest.url}\n\n付款核实后，报名才会正式生效。`,
+      `Thanks — ${collected.studentName}'s details are confirmed! ✅\nReference: ${ref}\n${subject.en} · ${slot.en} (online) · ${price}\nPayment link: ${payment.paymentRequest.url}\n\nThe enrolment becomes active only after payment is verified.`);
+  }
   return say(lang,
-    `太好了，${collected.studentName} 的报名已确认！✅\n参考编号：${ref}\n${subject.zh} · ${slot.zh}（线上）· RM${item.amount}/堂\n\n我们马上会发送付款链接给您，收到付款后老师和上课链接会另行通知。`,
-    `You're all set — ${collected.studentName}'s enrolment is confirmed! ✅\nReference: ${ref}\n${subject.en} · ${slot.en} (online) · RM${item.amount}/class\n\nWe'll send a payment link shortly. Once payment is received, we'll share the tutor and class link.`);
+    `谢谢，${collected.studentName} 的资料已确认！✅\n参考编号：${ref}\n${subject.zh} · ${slot.zh}（线上）· ${price}\n\n名额已暂时保留，但付款系统尚未连接。工作人员会尽快发送付款说明；付款核实后报名才会生效。`,
+    `Thanks — ${collected.studentName}'s details are confirmed! ✅\nReference: ${ref}\n${subject.en} · ${slot.en} (online) · ${price}\n\nThe slot is temporarily held, but online payment is not configured. Our team will send payment instructions; enrolment activates only after payment is verified.`);
 }
 
 // 目前只有补习中心配好了完整的资料采集流程（科目目录、必填字段、提取规则）。
@@ -125,7 +172,7 @@ export function handleInboundMessage({ industry, phone, text }) {
   const message = String(text || '').trim();
   if (!message) return { error: 'message is required' };
 
-  let item = findActiveItem(store, phone);
+  let item = findConversationItem(store, phone);
   const isNew = !item;
   if (isNew) item = createInquiryItem(store, phone);
   if (!item.language) item.language = detectLanguage(message);
@@ -142,10 +189,12 @@ export function handleInboundMessage({ industry, phone, text }) {
   } else if (isHumanRequest(message)) {
     reply = escalate(item, lang, '客户要求转人工', 'customer asked to speak with a person');
   } else if (item.stage === 'inquiry') {
+    prefillFromOpeningMessage(message, item.collected);
     item.stage = 'details_collection';
-    item.missingField = FIELD_ORDER[0].key;
+    const firstMissing = nextMissingField(item.collected);
+    item.missingField = firstMissing.key;
     const greeting = say(lang, '您好，欢迎联系 ClassOps 补习中心！🎓', 'Hi, thanks for reaching out to ClassOps Tuition Centre! 🎓');
-    reply = `${greeting}\n${resolveText(FIELD_ORDER[0].prompt, item.collected, lang)}`;
+    reply = `${greeting}\n${resolveText(firstMissing.prompt, item.collected, lang)}`;
     item.automation = bi('助手正在 WhatsApp 上收集报名资料', 'Assistant collecting enrolment details on WhatsApp');
   } else if (item.stage === 'details_collection') {
     const field = fieldByKey(item.missingField) || nextMissingField(item.collected);
@@ -174,14 +223,14 @@ export function handleInboundMessage({ industry, phone, text }) {
         item.missingField = null;
         item.stage = 'options_presented';
         item.automation = bi('已提供课程选项，等待家长选择', "Class options presented · awaiting parent's choice");
-        reply = `${describeSubjectFee(item.collected.subject, lang)}\n\n${describeSummary(item.collected, lang)}`;
+        reply = describeSummary(item.collected, lang);
       }
     }
   } else if (item.stage === 'options_presented') {
-    if (isConfirmation(message)) {
+    if (isNegative(message)) {
+      reply = cancelEnrolment(item, lang);
+    } else if (isConfirmation(message)) {
       reply = finalizeEnrolment(item, lang);
-    } else if (isNegative(message)) {
-      reply = escalate(item, lang, '家长想修改报名详情', 'parent wants to change the enrolment details');
     } else {
       item.retryCount = (item.retryCount || 0) + 1;
       if (item.retryCount >= 3) {
@@ -199,7 +248,7 @@ export function handleInboundMessage({ industry, phone, text }) {
   }
 
   appendTranscript(item, 'out', reply);
-  logAudit({ industry, actor: 'assistant', tool: 'whatsapp_outbound', input: { phone, text: reply, itemId: item.id, stage: item.stage }, status: 'sent' });
+  logAudit({ industry, actor: 'assistant', tool: 'whatsapp_outbound', input: { phone, text: reply, itemId: item.id, stage: item.stage }, status: 'prepared' });
 
   return { reply, item, isNewConversation: isNew };
 }

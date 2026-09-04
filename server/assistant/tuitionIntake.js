@@ -38,21 +38,26 @@ function buildSubjectCatalog() {
   for (const pkg of packages) {
     const key = canonicalSubjectKey(pkg.subject);
     if (!bySubject.has(key)) {
-      bySubject.set(key, { subject: pkg.subject, schedules: new Set(), fees: [] });
+      bySubject.set(key, { subject: pkg.subject, offers: [] });
     } else if (isCrashVariant(bySubject.get(key).subject) && !isCrashVariant(pkg.subject)) {
       bySubject.get(key).subject = pkg.subject; // 换成不带「冲刺班」字样的常规班名称当显示名
     }
     const entry = bySubject.get(key);
-    entry.schedules.add(JSON.stringify(pkg.schedule));
-    const feePerClass = pkg.billingType === 'monthly' ? pkg.monthlyFee / pkg.expectedSessionsPerMonth : pkg.fee / pkg.totalSessions;
-    entry.fees.push(feePerClass);
+    const billingType = pkg.billingType === 'monthly' ? 'monthly' : 'per-class';
+    const amount = billingType === 'monthly' ? pkg.monthlyFee : Math.round(pkg.fee / pkg.totalSessions);
+    entry.offers.push({
+      id: pkg.id,
+      billingType,
+      schedule: pkg.schedule,
+      amount,
+      sessionsPerMonth: pkg.expectedSessionsPerMonth || null,
+    });
   }
   return [...bySubject.values()].map((entry) => ({
     subject: entry.subject,
     level: inferLevel(entry.subject),
     keywords: subjectKeywords(entry.subject),
-    feePerClass: Math.round(entry.fees.reduce((a, b) => a + b, 0) / entry.fees.length),
-    slots: [...entry.schedules].map((s) => JSON.parse(s)),
+    offers: entry.offers,
   }));
 }
 
@@ -106,7 +111,12 @@ export function matchSubject(text, levelLabel) {
 export function subjectPrompt(collected, lang) {
   const levelLabel = collected?.studentLevel?.label;
   const list = subjectsForLevel(levelLabel);
-  const lines = list.map((entry, i) => `${i + 1}. ${lang === 'zh' ? entry.subject.zh : entry.subject.en} — RM${entry.feePerClass}/${feeUnit(lang)}`).join('\n');
+  const lines = list.map((entry, i) => {
+    const prices = [...new Set(entry.offers.map((offer) => offer.billingType === 'monthly'
+      ? `RM${offer.amount}/${lang === 'zh' ? '月' : 'month'}`
+      : `RM${offer.amount}/${feeUnit(lang)}`))].join(' · ');
+    return `${i + 1}. ${lang === 'zh' ? entry.subject.zh : entry.subject.en} — ${prices}`;
+  }).join('\n');
   return lang === 'zh'
     ? `我们目前开设的科目：\n${lines}\n\n想报读哪一个呢？（输入编号或科目名称都可以）`
     : `Here are the subjects we offer:\n${lines}\n\nWhich one would you like? (reply with the number or the subject name)`;
@@ -126,16 +136,49 @@ const LEVEL_PATTERNS = [
 
 export function matchLevel(text) {
   const hit = LEVEL_PATTERNS.find((p) => p.re.test(text));
-  return hit ? { raw: text.trim(), label: hit.label } : (text.trim().length >= 1 && text.trim().length <= 20 ? { raw: text.trim(), label: null } : null);
+  if (hit) return hit.label ? { raw: text.trim(), label: hit.label } : null;
+  return null;
 }
 
 export function matchBilling(text) {
   // 问题本身就是「按堂计费，还是月费套餐」，家长很自然地只回「monthly」/「月费」
   // 两个字，不会重复「套餐」这个词——原本只认「package/套餐」导致这类正常回答
   // 被打回重问，是提取规则没覆盖到自己问题里的用词，必须补上。
-  if (/package|套餐|paket|monthly|month|月费|按月/i.test(text)) return 'package';
+  if (/monthly|month|月费|按月/i.test(text)) return 'monthly';
   if (/per.?class|per.?session|按堂|一堂一堂|pay.?as.?you.?go/i.test(text)) return 'per-class';
   return null;
+}
+
+export function offersForSelection(collected) {
+  if (!collected?.subject) return [];
+  return collected.subject.offers.filter((offer) => offer.billingType === collected.billingPreference);
+}
+
+export function schedulePrompt(collected, lang) {
+  const offers = offersForSelection(collected);
+  const lines = offers.map((offer, index) => {
+    const schedule = lang === 'zh' ? offer.schedule.zh : offer.schedule.en;
+    const price = offer.billingType === 'monthly'
+      ? `RM${offer.amount}/${lang === 'zh' ? '月' : 'month'}`
+      : `RM${offer.amount}/${feeUnit(lang)}`;
+    return `${index + 1}. ${schedule} — ${price}`;
+  }).join('\n');
+  if (!offers.length) {
+    return lang === 'zh'
+      ? '这个科目暂时没有您选择的收费方式。请输入「按堂」或「月费」重新选择。'
+      : 'That billing option is not available for this subject. Please choose “per class” or “monthly”.';
+  }
+  return lang === 'zh'
+    ? `请选择上课时段：\n${lines}\n\n请输入编号。`
+    : `Please choose a class schedule:\n${lines}\n\nReply with the number.`;
+}
+
+export function matchSchedule(text, collected) {
+  const offers = offersForSelection(collected);
+  const trimmed = text.trim();
+  if (/^\d+$/.test(trimmed)) return offers[Number(trimmed) - 1] || null;
+  const lower = trimmed.toLowerCase();
+  return offers.find((offer) => `${offer.schedule.zh} ${offer.schedule.en}`.toLowerCase().includes(lower)) || null;
 }
 
 // 家长很少只回一个名字，常见的是「我是 XXX」「my name is XXX」这类完整句子——
@@ -151,8 +194,8 @@ export function matchName(text) {
 }
 
 export function isConfirmation(text) {
-  return /^\s*(confirm|confirmed|yes|yep|ok(ay)?|sure|可以|确认|好的?|好|同意)\s*[.!。！]?\s*$/i.test(text)
-    || /\bconfirm\b/i.test(text) || /确认/.test(text);
+  if (isNegative(text) || /\b(?:do not|don't|dont|not|cannot|can't|cancel)\b.*\bconfirm\b/i.test(text) || /不.{0,3}确认|不要确认|取消确认/.test(text)) return false;
+  return /^\s*(confirm|confirmed|yes|yep|ok(ay)?|sure|可以|确认|好的?|好|同意)\s*[.!。！]?\s*$/i.test(text);
 }
 
 export function isHumanRequest(text) {
@@ -160,7 +203,9 @@ export function isHumanRequest(text) {
 }
 
 export function isNegative(text) {
-  return /^\s*(no|nope|cancel|不要|不用了|取消)\s*[.!。！]?\s*$/i.test(text);
+  return /^\s*(no|nope|cancel|不要|不用了|取消)\s*[.!。！]?\s*$/i.test(text)
+    || /\b(?:do not|don't|dont|not)\b.*\bconfirm\b/i.test(text)
+    || /不.{0,3}确认|不要确认|取消确认/.test(text);
 }
 
 // 采集顺序：每题只问一件事，靠「当前问哪一题」缩小提取范围，
@@ -178,8 +223,9 @@ export const FIELD_ORDER = [
   },
   {
     key: 'studentLevel',
-    prompt: bi('孩子目前是几年级 / 什么阶段呢？（例如 Year 6、Form 3、SPM）', "What year/form is your child in? (e.g. Year 6, Form 3, SPM)"),
+    prompt: bi('孩子目前是什么学制和年级呢？（例如 Standard 6、Form 3、SPM、IGCSE Year 6）', "What curriculum and year/form is your child in? (e.g. Standard 6, Form 3, SPM, or IGCSE Year 6)"),
     extract: (text) => matchLevel(text),
+    invalidReply: bi('Year 6 可能是本地小学或国际课程，请注明 Standard/UPSR 或 IGCSE。', '“Year 6” may mean local primary or an international curriculum. Please specify Standard/UPSR or IGCSE.'),
   },
   {
     key: 'subject',
@@ -191,8 +237,19 @@ export const FIELD_ORDER = [
   },
   {
     key: 'billingPreference',
-    prompt: bi('付费方式想选按堂计费，还是月费套餐呢？', 'Would you prefer to pay per class, or a monthly package?'),
-    extract: (text) => matchBilling(text),
+    prompt: bi('付费方式想选按堂计费，还是按月付费呢？', 'Would you prefer to pay per class, or monthly?'),
+    extract: (text, collected) => {
+      const billing = matchBilling(text);
+      if (!billing) return null;
+      return collected?.subject?.offers.some((offer) => offer.billingType === billing) ? billing : null;
+    },
+    invalidReply: bi('这个科目没有该收费方式。请输入「按堂」或「月费」。', 'That billing option is unavailable for this subject. Reply “per class” or “monthly”.'),
+  },
+  {
+    key: 'selectedOffer',
+    prompt: (collected, lang) => schedulePrompt(collected, lang),
+    extract: (text, collected) => matchSchedule(text, collected),
+    invalidReply: (collected, lang) => schedulePrompt(collected, lang),
   },
 ];
 
