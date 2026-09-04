@@ -3,6 +3,7 @@
 // 工具调用与最终结果——每一条进出 WhatsApp 的消息都要留痕。
 let seq = 1;
 const auditLog = [];
+const processedInboundMessageIds = new Set();
 
 export function logAudit(entry) {
   const record = { id: seq++, timestamp: new Date().toISOString(), ...entry };
@@ -12,4 +13,11 @@ export function logAudit(entry) {
 
 export function getAuditLog(industry, limit = 30) {
   return auditLog.filter((e) => e.industry === industry).slice(0, limit);
+}
+
+export function claimInboundMessage(messageId) {
+  if (!messageId) return false;
+  if (processedInboundMessageIds.has(messageId)) return false;
+  processedInboundMessageIds.add(messageId);
+  return true;
 }

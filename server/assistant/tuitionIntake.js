@@ -38,21 +38,26 @@ function buildSubjectCatalog() {
   for (const pkg of packages) {
     const key = canonicalSubjectKey(pkg.subject);
     if (!bySubject.has(key)) {
-      bySubject.set(key, { subject: pkg.subject, schedules: new Set(), fees: [] });
+      bySubject.set(key, { subject: pkg.subject, offers: [] });
     } else if (isCrashVariant(bySubject.get(key).subject) && !isCrashVariant(pkg.subject)) {
       bySubject.get(key).subject = pkg.subject; // 换成不带「冲刺班」字样的常规班名称当显示名
     }
     const entry = bySubject.get(key);
-    entry.schedules.add(JSON.stringify(pkg.schedule));
-    const feePerClass = pkg.billingType === 'monthly' ? pkg.monthlyFee / pkg.expectedSessionsPerMonth : pkg.fee / pkg.totalSessions;
-    entry.fees.push(feePerClass);
+    const billingType = pkg.billingType === 'monthly' ? 'monthly' : 'per-class';
+    const amount = billingType === 'monthly' ? pkg.monthlyFee : Math.round(pkg.fee / pkg.totalSessions);
+    entry.offers.push({
+      id: pkg.id,
+      billingType,
+      schedule: pkg.schedule,
+      amount,
+      sessionsPerMonth: pkg.expectedSessionsPerMonth || null,
+    });
   }
   return [...bySubject.values()].map((entry) => ({
     subject: entry.subject,
     level: inferLevel(entry.subject),
     keywords: subjectKeywords(entry.subject),
-    feePerClass: Math.round(entry.fees.reduce((a, b) => a + b, 0) / entry.fees.length),
-    slots: [...entry.schedules].map((s) => JSON.parse(s)),
+    offers: entry.offers,
   }));
 }
 
@@ -106,36 +111,83 @@ export function matchSubject(text, levelLabel) {
 export function subjectPrompt(collected, lang) {
   const levelLabel = collected?.studentLevel?.label;
   const list = subjectsForLevel(levelLabel);
-  const lines = list.map((entry, i) => `${i + 1}. ${lang === 'zh' ? entry.subject.zh : entry.subject.en} — RM${entry.feePerClass}/${feeUnit(lang)}`).join('\n');
+  const lines = list.map((entry, i) => {
+    const prices = [...new Set(entry.offers.map((offer) => offer.billingType === 'monthly'
+      ? `RM${offer.amount}/${lang === 'zh' ? '月' : 'month'}`
+      : `RM${offer.amount}/${feeUnit(lang)}`))].join(' · ');
+    return `${i + 1}. ${lang === 'zh' ? entry.subject.zh : entry.subject.en} — ${prices}`;
+  }).join('\n');
   return lang === 'zh'
     ? `我们目前开设的科目：\n${lines}\n\n想报读哪一个呢？（输入编号或科目名称都可以）`
     : `Here are the subjects we offer:\n${lines}\n\nWhich one would you like? (reply with the number or the subject name)`;
 }
 
-// 顺序刻意从最具体的马来西亚本地说法排到最笼统的国际说法——单独的
-// "Year 6" 在本地语境其实有歧义（可能是 UPSR 的 Std 6，也可能是 IGCSE
-// 学制），只有明确出现 "igcse" / "a level" 才标成 IGCSE，避免把常见的
-// 本地口语误判成国际学制。
+// 顺序刻意从最具体的马来西亚本地说法排到最笼统的国际说法。
 const LEVEL_PATTERNS = [
   { re: /std\s*\d|standard\s*\d|upsr|小\s*[1-6一二三四五六]/i, label: 'UPSR / Primary' },
   { re: /form\s*[1-3]|pt3|中\s*[1-3一二三]/i, label: 'PT3' },
   { re: /form\s*[4-5]|spm|中\s*[4-5四五]/i, label: 'SPM' },
   { re: /igcse|a.?level/i, label: 'IGCSE' },
-  { re: /year\s*\d/i, label: null },
 ];
+
+// 单独的 "Year 6" 曾经被当成彻底无法识别，一律打回重问——但这其实是本地
+// 家长很常见的说法（马来西亚小学阶段口语上常用 "Year N" 代替 "Standard N"），
+// 一律拒绝反而更烦人。本地体系升上中学后一律改叫 Form 1-5，不会再用
+// "Year"；只有国际体系（IGCSE）才会用 "Year 7" 以上的说法。用数字区间
+// 消歧义，比强迫家长自己讲清楚「是本地班还是国际班」更贴近真实对话习惯。
+const YEAR_NUMBER = /year\s*(\d{1,2})/i;
 
 export function matchLevel(text) {
   const hit = LEVEL_PATTERNS.find((p) => p.re.test(text));
-  return hit ? { raw: text.trim(), label: hit.label } : (text.trim().length >= 1 && text.trim().length <= 20 ? { raw: text.trim(), label: null } : null);
+  if (hit) return { raw: text.trim(), label: hit.label };
+  const yearMatch = text.match(YEAR_NUMBER);
+  if (yearMatch) {
+    const n = Number(yearMatch[1]);
+    if (n >= 1 && n <= 6) return { raw: text.trim(), label: 'UPSR / Primary' };
+    if (n >= 7 && n <= 13) return { raw: text.trim(), label: 'IGCSE' };
+  }
+  return null;
 }
 
 export function matchBilling(text) {
   // 问题本身就是「按堂计费，还是月费套餐」，家长很自然地只回「monthly」/「月费」
   // 两个字，不会重复「套餐」这个词——原本只认「package/套餐」导致这类正常回答
   // 被打回重问，是提取规则没覆盖到自己问题里的用词，必须补上。
-  if (/package|套餐|paket|monthly|month|月费|按月/i.test(text)) return 'package';
+  if (/monthly|month|月费|按月/i.test(text)) return 'monthly';
   if (/per.?class|per.?session|按堂|一堂一堂|pay.?as.?you.?go/i.test(text)) return 'per-class';
   return null;
+}
+
+export function offersForSelection(collected) {
+  if (!collected?.subject) return [];
+  return collected.subject.offers.filter((offer) => offer.billingType === collected.billingPreference);
+}
+
+export function schedulePrompt(collected, lang) {
+  const offers = offersForSelection(collected);
+  const lines = offers.map((offer, index) => {
+    const schedule = lang === 'zh' ? offer.schedule.zh : offer.schedule.en;
+    const price = offer.billingType === 'monthly'
+      ? `RM${offer.amount}/${lang === 'zh' ? '月' : 'month'}`
+      : `RM${offer.amount}/${feeUnit(lang)}`;
+    return `${index + 1}. ${schedule} — ${price}`;
+  }).join('\n');
+  if (!offers.length) {
+    return lang === 'zh'
+      ? '这个科目暂时没有您选择的收费方式。请输入「按堂」或「月费」重新选择。'
+      : 'That billing option is not available for this subject. Please choose “per class” or “monthly”.';
+  }
+  return lang === 'zh'
+    ? `请选择上课时段：\n${lines}\n\n请输入编号。`
+    : `Please choose a class schedule:\n${lines}\n\nReply with the number.`;
+}
+
+export function matchSchedule(text, collected) {
+  const offers = offersForSelection(collected);
+  const trimmed = text.trim();
+  if (/^\d+$/.test(trimmed)) return offers[Number(trimmed) - 1] || null;
+  const lower = trimmed.toLowerCase();
+  return offers.find((offer) => `${offer.schedule.zh} ${offer.schedule.en}`.toLowerCase().includes(lower)) || null;
 }
 
 // 家长很少只回一个名字，常见的是「我是 XXX」「my name is XXX」这类完整句子——
@@ -146,13 +198,26 @@ const NAME_PREAMBLE = /^(my name is|i am|i'm|this is|我是|我叫|本人是)\s*
 export function matchName(text) {
   const trimmed = text.trim().replace(NAME_PREAMBLE, '').trim();
   if (!trimmed || /\d{5,}/.test(trimmed)) return null; // 一长串数字大概率不是名字（比如误输入电话）
-  if (trimmed.length > 60) return null;
+  // 单字母与常见占位词只是测试/无效输入，不能让报名流程继续。
+  // 两个字符仍可覆盖常见的简短中文姓名与英文昵称。
+  if (trimmed.length < 2 || trimmed.length > 60) return null;
+  const letters = trimmed.match(/\p{L}/gu) || [];
+  if (letters.length < 2) return null; // 拒绝 "11"、"--" 等没有真实姓名文字的输入
+  if (/^(?:test(?:ing)?|n\/?a|none|null|unknown|yes|no)$/i.test(trimmed)) return null;
+  // 拉丁字母下，"AA"／"AAAA" 这种只有一个字母反复出现的输入会通过上面的字数检查，
+  // 但真实的拉丁名字不会只用同一个字母——拒绝掉。中文名不受此限制，因为
+  // 叠字确实是常见的真实取名习惯（婷婷、明明），不能套同一条规则。
+  const isLatinOnly = /^[\p{Script=Latin}\s'.-]+$/u.test(trimmed);
+  if (isLatinOnly) {
+    const distinctLetters = new Set(letters.map((l) => l.toLowerCase()));
+    if (distinctLetters.size < 2) return null;
+  }
   return trimmed;
 }
 
 export function isConfirmation(text) {
-  return /^\s*(confirm|confirmed|yes|yep|ok(ay)?|sure|可以|确认|好的?|好|同意)\s*[.!。！]?\s*$/i.test(text)
-    || /\bconfirm\b/i.test(text) || /确认/.test(text);
+  if (isNegative(text) || /\b(?:do not|don't|dont|not|cannot|can't|cancel)\b.*\bconfirm\b/i.test(text) || /不.{0,3}确认|不要确认|取消确认/.test(text)) return false;
+  return /^\s*(confirm|confirmed|yes|yep|ok(ay)?|sure|可以|确认|好的?|好|同意)\s*[.!。！]?\s*$/i.test(text);
 }
 
 export function isHumanRequest(text) {
@@ -160,7 +225,9 @@ export function isHumanRequest(text) {
 }
 
 export function isNegative(text) {
-  return /^\s*(no|nope|cancel|不要|不用了|取消)\s*[.!。！]?\s*$/i.test(text);
+  return /^\s*(no|nope|cancel|不要|不用了|取消)\s*[.!。！]?\s*$/i.test(text)
+    || /\b(?:do not|don't|dont|not)\b.*\bconfirm\b/i.test(text)
+    || /不.{0,3}确认|不要确认|取消确认/.test(text);
 }
 
 // 采集顺序：每题只问一件事，靠「当前问哪一题」缩小提取范围，
@@ -170,16 +237,19 @@ export const FIELD_ORDER = [
     key: 'guardianName',
     prompt: bi('您好！想请问一下，怎么称呼您呢？（家长/监护人姓名）', "Hi! May I have your name (parent/guardian)?"),
     extract: (text) => matchName(text),
+    invalidReply: bi('请输入至少两个字的家长/监护人姓名。', 'Please enter the parent/guardian name using at least two characters.'),
   },
   {
     key: 'studentName',
     prompt: bi('谢谢！请问孩子的姓名是？', "Thanks! And what's your child's name?"),
     extract: (text) => matchName(text),
+    invalidReply: bi('请输入至少两个字的孩子姓名。', "Please enter your child's name using at least two characters."),
   },
   {
     key: 'studentLevel',
-    prompt: bi('孩子目前是几年级 / 什么阶段呢？（例如 Year 6、Form 3、SPM）', "What year/form is your child in? (e.g. Year 6, Form 3, SPM)"),
+    prompt: bi('孩子目前是什么学制和年级呢？（例如 Standard 6、Form 3、SPM、IGCSE Year 6）', "What curriculum and year/form is your child in? (e.g. Standard 6, Form 3, SPM, or IGCSE Year 6)"),
     extract: (text) => matchLevel(text),
+    invalidReply: bi('无法识别该学制或年级。请同时注明学制和年级，例如 Standard 6、Form 3、SPM 或 IGCSE Year 6。', "I couldn't identify that curriculum or level. Please use a format such as Standard 6, Form 3, SPM, or IGCSE Year 6."),
   },
   {
     key: 'subject',
@@ -191,8 +261,33 @@ export const FIELD_ORDER = [
   },
   {
     key: 'billingPreference',
-    prompt: bi('付费方式想选按堂计费，还是月费套餐呢？', 'Would you prefer to pay per class, or a monthly package?'),
-    extract: (text) => matchBilling(text),
+    prompt: bi('付费方式想选按堂计费，还是按月付费呢？', 'Would you prefer to pay per class, or monthly?'),
+    // 科目清单本来就已经把每个科目实际支持的收费方式（月费 / 按堂，或两者都有）
+    // 摆出来了；如果这个科目只有一种收费方式，就不该再问一次只有一个合法答案
+    // 的问题——之前曾经出现过「科目只支持月费，家长照着常见说法回『per class』
+    // 却被打回」的情况，属于问了一个根本没有第二个答案的问题。
+    autoFill: (collected) => {
+      const types = [...new Set((collected?.subject?.offers || []).map((offer) => offer.billingType))];
+      return types.length === 1 ? types[0] : undefined;
+    },
+    extract: (text, collected) => {
+      const billing = matchBilling(text);
+      if (!billing) return null;
+      return collected?.subject?.offers.some((offer) => offer.billingType === billing) ? billing : null;
+    },
+    invalidReply: bi('这个科目没有该收费方式。请输入「按堂」或「月费」。', 'That billing option is unavailable for this subject. Reply “per class” or “monthly”.'),
+  },
+  {
+    key: 'selectedOffer',
+    prompt: (collected, lang) => schedulePrompt(collected, lang),
+    // 同理：大部分科目在选定收费方式后其实只剩一个上课时段，没必要让家长
+    // 从「1 个选项」里选一个。
+    autoFill: (collected) => {
+      const offers = offersForSelection(collected);
+      return offers.length === 1 ? offers[0] : undefined;
+    },
+    extract: (text, collected) => matchSchedule(text, collected),
+    invalidReply: (collected, lang) => schedulePrompt(collected, lang),
   },
 ];
 

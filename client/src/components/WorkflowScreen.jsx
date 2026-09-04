@@ -32,6 +32,7 @@ const copy = {
 // 「执行下一步」会直接跳到下一阶段，等于跳过了还没问完的问题，把不完整的
 // collected 数据当成已确认的报名，这是真实的数据错误，不能让它可点。
 const PRE_CONFIRM_STAGES = ['inquiry', 'details_collection', 'options_presented'];
+const PAYMENT_CONTROLLED_STAGES = ['slot_reserved', 'payment_pending'];
 
 const stageIcons = {
   request: '💬', quotation: '🧾', confirmed: '✓',
@@ -43,6 +44,7 @@ const stageIcons = {
   inquiry: '💬', details_collection: '📝', options_presented: '📋', customer_confirmed: '✅',
   slot_reserved: '🔒', payment_pending: '💳', enrolled: '🎓', class_scheduled: '📅',
   attendance_tracking: '📊', class_completed: '🏁', invoiced: '▤', paid: 'RM',
+  cancelled: '×',
 };
 
 function RequestForm({ lang, industry, fieldLabels, onClose, onCreated }) {
@@ -113,7 +115,9 @@ export default function WorkflowScreen({ lang = 'en', industry, onToast }) {
           return <article key={item.id} className="rounded-xl border border-amber-200 bg-white p-4"><div className="flex items-center justify-between"><strong className="text-xs text-primary">{item.id}</strong><span className="text-[10px] font-bold text-muted-foreground">{item.age}</span></div><h3 className="mt-2 text-sm font-extrabold">{item.customer}</h3><p className="mt-1 text-xs text-muted-foreground">{pick(lang, item.automation)}</p>
             {isStuckConversation
               ? <Button className="mt-3 w-full" size="sm" variant="outline" onClick={() => { setTestingItem(item); setTesting(true); }}>💬 {lang === 'zh' ? '查看 WhatsApp 对话' : 'Open WhatsApp conversation'}</Button>
-              : <Button className="mt-3 w-full" size="sm" onClick={() => advance(item)} disabled={busy === item.id}>{item.needsApproval ? c.approve : c.fix}</Button>}
+              : PAYMENT_CONTROLLED_STAGES.includes(item.stage)
+                ? <Button className="mt-3 w-full" size="sm" variant="outline" disabled>{lang === 'zh' ? '等待付款处理' : 'Awaiting payment handling'}</Button>
+                : <Button className="mt-3 w-full" size="sm" onClick={() => advance(item)} disabled={busy === item.id}>{item.needsApproval ? c.approve : c.fix}</Button>}
           </article>;
         })}</div> : <p className="text-sm text-green-700">{c.allClear}</p>}
       </section>
@@ -123,7 +127,7 @@ export default function WorkflowScreen({ lang = 'en', industry, onToast }) {
         <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-4 md:mx-0 md:px-0">
           {workflow.stages.map((stage, index) => {
             const stageItems = workflow.items.filter((item) => item.stage === stage.key);
-            return <div key={stage.key} className="w-[245px] flex-none snap-start"><div className="mb-2 flex items-center gap-2 px-1"><span className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-900 text-[11px] font-black text-white">{stageIcons[stage.key]}</span><div><span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">{String(index + 1).padStart(2, '0')}</span><strong className="block text-xs">{pick(lang, stage.label)}</strong></div></div><div className="min-h-[190px] space-y-2 rounded-2xl bg-slate-100/80 p-2">{stageItems.length ? stageItems.map((item) => <article key={item.id} className="rounded-xl border bg-white p-3 shadow-sm"><div className="flex items-center justify-between"><span className="text-[10px] font-black text-primary">{item.id}</span><span className="text-[9px] font-bold text-muted-foreground">{item.source}</span></div><h3 className="mt-2 truncate text-xs font-extrabold">{item.customer}</h3><p className="mt-1 truncate text-[10px] text-muted-foreground">{item.route}</p>{item.amount > 0 && <strong className="mt-2 block text-xs">{fmtMoney(item.amount)}</strong>}<div className={`mt-2 rounded-lg px-2 py-1.5 text-[10px] font-semibold ${item.needsAttention || item.needsApproval ? 'bg-amber-50 text-amber-800' : 'bg-green-50 text-green-700'}`}>{pick(lang, item.automation)}</div>{stage.key !== 'reported' && !PRE_CONFIRM_STAGES.includes(stage.key) && <button onClick={() => advance(item)} disabled={busy === item.id} className="mt-2 w-full rounded-lg bg-slate-900 py-2 text-[10px] font-extrabold text-white disabled:opacity-40">{c.advance} →</button>}</article>) : <div className="px-2 py-8 text-center text-[10px] text-slate-400">{c.empty}</div>}</div></div>;
+            return <div key={stage.key} className="w-[245px] flex-none snap-start"><div className="mb-2 flex items-center gap-2 px-1"><span className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-900 text-[11px] font-black text-white">{stageIcons[stage.key]}</span><div><span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">{String(index + 1).padStart(2, '0')}</span><strong className="block text-xs">{pick(lang, stage.label)}</strong></div></div><div className="min-h-[190px] space-y-2 rounded-2xl bg-slate-100/80 p-2">{stageItems.length ? stageItems.map((item) => <article key={item.id} className="rounded-xl border bg-white p-3 shadow-sm"><div className="flex items-center justify-between"><span className="text-[10px] font-black text-primary">{item.id}</span><span className="text-[9px] font-bold text-muted-foreground">{item.source}</span></div><h3 className="mt-2 truncate text-xs font-extrabold">{item.customer}</h3><p className="mt-1 truncate text-[10px] text-muted-foreground">{item.route}</p>{item.amount > 0 && <strong className="mt-2 block text-xs">{fmtMoney(item.amount)}</strong>}<div className={`mt-2 rounded-lg px-2 py-1.5 text-[10px] font-semibold ${item.needsAttention || item.needsApproval ? 'bg-amber-50 text-amber-800' : 'bg-green-50 text-green-700'}`}>{pick(lang, item.automation)}</div>{stage.key !== 'reported' && !PRE_CONFIRM_STAGES.includes(stage.key) && !PAYMENT_CONTROLLED_STAGES.includes(stage.key) && stage.key !== 'cancelled' && <button onClick={() => advance(item)} disabled={busy === item.id} className="mt-2 w-full rounded-lg bg-slate-900 py-2 text-[10px] font-extrabold text-white disabled:opacity-40">{c.advance} →</button>}</article>) : <div className="px-2 py-8 text-center text-[10px] text-slate-400">{c.empty}</div>}</div></div>;
           })}
         </div>
       </section>
