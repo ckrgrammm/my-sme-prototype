@@ -79,8 +79,19 @@ function cancelEnrolment(item, lang) {
   return say(lang, '好的，这次报名已取消。如需重新报名，请告诉我们。', 'No problem — this enrolment has been cancelled. Message us whenever you would like to start again.');
 }
 
+// 有些字段（billingPreference / selectedOffer）在已知信息下其实只剩一个
+// 合法答案——见 tuitionIntake.js 里的 autoFill。遇到这种字段就直接填好、
+// 继续找下一题，不问只有一个答案的问题；autoFill 拿不出确定答案（比如
+// 两种收费方式都真的可选）就还是照常问。
 function nextMissingField(collected) {
-  return FIELD_ORDER.find((f) => collected[f.key] === undefined);
+  let next = FIELD_ORDER.find((f) => collected[f.key] === undefined);
+  while (next && next.autoFill) {
+    const value = next.autoFill(collected);
+    if (value === undefined) break;
+    collected[next.key] = value;
+    next = FIELD_ORDER.find((f) => collected[f.key] === undefined);
+  }
+  return next;
 }
 
 function prefillFromOpeningMessage(message, collected) {

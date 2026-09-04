@@ -122,21 +122,30 @@ export function subjectPrompt(collected, lang) {
     : `Here are the subjects we offer:\n${lines}\n\nWhich one would you like? (reply with the number or the subject name)`;
 }
 
-// 顺序刻意从最具体的马来西亚本地说法排到最笼统的国际说法——单独的
-// "Year 6" 在本地语境其实有歧义（可能是 UPSR 的 Std 6，也可能是 IGCSE
-// 学制），只有明确出现 "igcse" / "a level" 才标成 IGCSE，避免把常见的
-// 本地口语误判成国际学制。
+// 顺序刻意从最具体的马来西亚本地说法排到最笼统的国际说法。
 const LEVEL_PATTERNS = [
   { re: /std\s*\d|standard\s*\d|upsr|小\s*[1-6一二三四五六]/i, label: 'UPSR / Primary' },
   { re: /form\s*[1-3]|pt3|中\s*[1-3一二三]/i, label: 'PT3' },
   { re: /form\s*[4-5]|spm|中\s*[4-5四五]/i, label: 'SPM' },
   { re: /igcse|a.?level/i, label: 'IGCSE' },
-  { re: /year\s*\d/i, label: null },
 ];
+
+// 单独的 "Year 6" 曾经被当成彻底无法识别，一律打回重问——但这其实是本地
+// 家长很常见的说法（马来西亚小学阶段口语上常用 "Year N" 代替 "Standard N"），
+// 一律拒绝反而更烦人。本地体系升上中学后一律改叫 Form 1-5，不会再用
+// "Year"；只有国际体系（IGCSE）才会用 "Year 7" 以上的说法。用数字区间
+// 消歧义，比强迫家长自己讲清楚「是本地班还是国际班」更贴近真实对话习惯。
+const YEAR_NUMBER = /year\s*(\d{1,2})/i;
 
 export function matchLevel(text) {
   const hit = LEVEL_PATTERNS.find((p) => p.re.test(text));
-  if (hit) return hit.label ? { raw: text.trim(), label: hit.label } : null;
+  if (hit) return { raw: text.trim(), label: hit.label };
+  const yearMatch = text.match(YEAR_NUMBER);
+  if (yearMatch) {
+    const n = Number(yearMatch[1]);
+    if (n >= 1 && n <= 6) return { raw: text.trim(), label: 'UPSR / Primary' };
+    if (n >= 7 && n <= 13) return { raw: text.trim(), label: 'IGCSE' };
+  }
   return null;
 }
 
@@ -195,6 +204,14 @@ export function matchName(text) {
   const letters = trimmed.match(/\p{L}/gu) || [];
   if (letters.length < 2) return null; // 拒绝 "11"、"--" 等没有真实姓名文字的输入
   if (/^(?:test(?:ing)?|n\/?a|none|null|unknown|yes|no)$/i.test(trimmed)) return null;
+  // 拉丁字母下，"AA"／"AAAA" 这种只有一个字母反复出现的输入会通过上面的字数检查，
+  // 但真实的拉丁名字不会只用同一个字母——拒绝掉。中文名不受此限制，因为
+  // 叠字确实是常见的真实取名习惯（婷婷、明明），不能套同一条规则。
+  const isLatinOnly = /^[\p{Script=Latin}\s'.-]+$/u.test(trimmed);
+  if (isLatinOnly) {
+    const distinctLetters = new Set(letters.map((l) => l.toLowerCase()));
+    if (distinctLetters.size < 2) return null;
+  }
   return trimmed;
 }
 
@@ -245,6 +262,14 @@ export const FIELD_ORDER = [
   {
     key: 'billingPreference',
     prompt: bi('付费方式想选按堂计费，还是按月付费呢？', 'Would you prefer to pay per class, or monthly?'),
+    // 科目清单本来就已经把每个科目实际支持的收费方式（月费 / 按堂，或两者都有）
+    // 摆出来了；如果这个科目只有一种收费方式，就不该再问一次只有一个合法答案
+    // 的问题——之前曾经出现过「科目只支持月费，家长照着常见说法回『per class』
+    // 却被打回」的情况，属于问了一个根本没有第二个答案的问题。
+    autoFill: (collected) => {
+      const types = [...new Set((collected?.subject?.offers || []).map((offer) => offer.billingType))];
+      return types.length === 1 ? types[0] : undefined;
+    },
     extract: (text, collected) => {
       const billing = matchBilling(text);
       if (!billing) return null;
@@ -255,6 +280,12 @@ export const FIELD_ORDER = [
   {
     key: 'selectedOffer',
     prompt: (collected, lang) => schedulePrompt(collected, lang),
+    // 同理：大部分科目在选定收费方式后其实只剩一个上课时段，没必要让家长
+    // 从「1 个选项」里选一个。
+    autoFill: (collected) => {
+      const offers = offersForSelection(collected);
+      return offers.length === 1 ? offers[0] : undefined;
+    },
     extract: (text, collected) => matchSchedule(text, collected),
     invalidReply: (collected, lang) => schedulePrompt(collected, lang),
   },
