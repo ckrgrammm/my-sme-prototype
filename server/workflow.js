@@ -1,5 +1,6 @@
 import { WORKFLOWS } from './industries/index.js';
 import { bi } from './industries/shared.js';
+import { verifyTuitionPayment } from './assistant/tuitionOperations.js';
 
 function snapshot(industry) {
   const data = WORKFLOWS[industry];
@@ -61,11 +62,31 @@ export function advanceWorkflow(industry, id) {
   if (!item) return { error: 'workflow item not found' };
   const index = data.stages.findIndex(([key]) => key === item.stage);
   if (index < 0 || index === data.stages.length - 1) return { error: 'item is already complete' };
+  if (industry === 'tuition' && ['slot_reserved', 'payment_pending'].includes(item.stage)) {
+    return { error: 'payment must be verified through the payment verification endpoint before enrolment' };
+  }
   item.stage = data.stages[index + 1][0];
   item.needsAttention = false;
   item.needsApproval = false;
   item.age = 'now';
   item.automation = data.messages[item.stage];
   data.events.unshift({ id: Date.now(), time: new Date().toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' }), text: bi(`${item.id}：${item.automation.zh}`, `${item.id}: ${item.automation.en}`), type: item.stage });
+  return { item, workflow: snapshot(industry) };
+}
+
+export function verifyWorkflowPayment(industry, id, evidence = {}) {
+  if (industry !== 'tuition') return { error: 'payment verification is not configured for this industry' };
+  const data = WORKFLOWS[industry];
+  const item = data?.items.find((entry) => entry.id === id);
+  if (!item) return { error: 'workflow item not found' };
+  if (item.stage !== 'payment_pending') return { error: 'item is not awaiting payment' };
+  const result = verifyTuitionPayment({ enrolmentId: id, reference: evidence.reference, amount: evidence.amount });
+  if (!result.ok) return { error: result.error };
+  item.stage = 'enrolled';
+  item.needsAttention = false;
+  item.paymentRequest = result.paymentRequest;
+  item.automation = data.messages.enrolled;
+  item.age = 'now';
+  data.events.unshift({ id: Date.now(), time: new Date().toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' }), text: bi(`${id}：付款已核实，报名生效`, `${id}: Payment verified · enrolment active`), type: 'payment' });
   return { item, workflow: snapshot(industry) };
 }
