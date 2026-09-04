@@ -94,6 +94,7 @@ export const workflow = {
       ['inquiry', bi('咨询进线', 'Inquiry')],
       ['details_collection', bi('收集资料中', 'Collecting details')],
       ['options_presented', bi('已提供选项', 'Options presented')],
+      ['cancelled', bi('已取消', 'Cancelled')],
       ['customer_confirmed', bi('家长已确认', 'Customer confirmed')],
       ['slot_reserved', bi('名额已预留', 'Slot reserved')],
       ['payment_pending', bi('待付款', 'Payment pending')],
@@ -115,7 +116,7 @@ export const workflow = {
       { id: 'ENR-3305', customer: 'Mdm Lee（Xin Yi 家长）', phone: '+60 16-773 1120', route: '周二 / 四 18:00–19:30', cargo: 'PT3 国文 · 8 堂套餐', amount: 400, stage: 'attendance_tracking', source: 'WhatsApp', automation: bi('已上课 3/8 堂，进度正常', '3 of 8 sessions completed · on track'), age: '1 hr' },
       { id: 'ENR-3306', customer: 'Mr. Kumar（Aditya 家长）', phone: '+60 12-556 8890', route: '周五 20:00–21:30', cargo: 'SPM 生物 · 8 堂套餐', amount: 480, stage: 'class_completed', source: 'WhatsApp', automation: bi('8 堂课程已完成，等待家长续费决定', 'All 8 sessions completed · awaiting renewal decision'), needsAttention: true, age: '2 hr' },
       { id: 'INV-3307', customer: 'Puan Farida（Nabil 家长）', phone: '+60 11-990 3345', route: '周六 14:00–15:30', cargo: 'SPM 化学 · 8 堂套餐', amount: 520, stage: 'invoiced', source: 'WhatsApp', automation: bi('课程已完成，发票已生成', 'Package completed · invoice generated'), age: '3 hr' },
-      { id: 'INV-3308', customer: 'Mr. Ong（Kai Xuan 家长）', phone: '+60 17-224 6690', route: '周三 19:00–20:30', cargo: 'IGCSE 英文 · 10 堂套餐', amount: 700, stage: 'paid', source: 'WhatsApp', automation: bi('学费已逾期，账期 12 天', 'Tuition fee overdue · 12 days past due'), needsAttention: true, age: '2 days' },
+      { id: 'INV-3308', customer: 'Mr. Ong（Kai Xuan 家长）', phone: '+60 17-224 6690', route: '周三 19:00–20:30', cargo: 'IGCSE 英文 · 10 堂套餐', amount: 700, stage: 'paid', source: 'WhatsApp', automation: bi('学费已收，等待入账', 'Tuition fee received · awaiting reconciliation'), age: '2 days' },
     ],
     events: [
       { id: 1, time: '10:18', text: bi('已发送出席提醒 ENR-3305', 'Attendance reminder sent for ENR-3305'), type: 'message' },
@@ -126,6 +127,7 @@ export const workflow = {
     messages: {
       details_collection: bi('助手正在 WhatsApp 上收集报名资料', 'Assistant collecting enrolment details on WhatsApp'),
       options_presented: bi('已提供课程选项，等待家长选择', 'Class options presented · awaiting parent’s choice'),
+      cancelled: bi('家长已取消此次报名', 'Parent cancelled this enrolment'),
       customer_confirmed: bi('家长已确认，报名记录已自动建立', 'Parent confirmed · enrolment record auto-created'),
       slot_reserved: bi('名额已预留，等待付款', 'Slot reserved · awaiting payment'),
       payment_pending: bi('等待家长付款', 'Awaiting payment from parent'),
