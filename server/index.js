@@ -2,6 +2,11 @@ import express from 'express';
 import cors from 'cors';
 import { CONFIG, INDUSTRY_ORDER, genTimeline } from './data.js';
 import { advanceWorkflow, createRequest, getWorkflow, hasWorkflow } from './workflow.js';
+import { sendWhatsAppMessage } from './whatsapp.js';
+import { handleInboundMessage } from './assistant/conversationEngine.js';
+import { getAuditLog } from './assistant/store.js';
+
+try { process.loadEnvFile(); } catch { /* no .env file present — fall back to the process environment */ }
 
 const app = express();
 app.use(cors());
@@ -23,33 +28,41 @@ app.get('/api/integrations/whatsapp/webhook', (req, res) => {
   res.status(200).send(req.query['hub.challenge']);
 });
 
-app.post('/api/integrations/whatsapp/webhook', (req, res) => {
-  // Meta requires a fast acknowledgement. Production should enqueue the payload
-  // for durable processing instead of doing workflow work in this request.
+// 目前只有补习中心接了完整的报名对话流程（server/assistant/conversationEngine.js），
+// 所以这条真实 webhook 先固定路由到 tuition。真正多租户时应该从
+// value.metadata.phone_number_id 反查是哪个卖家/哪个行业，而不是写死。
+const WEBHOOK_INDUSTRY = 'tuition';
+
+function extractInboundTextMessages(payload) {
+  const messages = [];
+  for (const entry of payload?.entry || []) {
+    for (const change of entry.changes || []) {
+      for (const msg of change.value?.messages || []) {
+        if (msg.type === 'text' && msg.text?.body) messages.push({ from: msg.from, text: msg.text.body });
+      }
+    }
+  }
+  return messages;
+}
+
+app.post('/api/integrations/whatsapp/webhook', async (req, res) => {
+  // Meta 要求 webhook 立刻确认收到；真正生产环境应该把 payload 放进持久队列
+  // 异步处理，而不是在这个请求里直接跑对话逻辑。原型阶段先同步处理，图简单。
   res.sendStatus(200);
+  const inbound = extractInboundTextMessages(req.body || {});
+  for (const { from, text } of inbound) {
+    const result = handleInboundMessage({ industry: WEBHOOK_INDUSTRY, phone: from, text });
+    if (result.error) continue;
+    await sendWhatsAppMessage(from, result.reply);
+  }
 });
 
 app.post('/api/integrations/whatsapp/send', async (req, res) => {
-  const token = process.env.WHATSAPP_ACCESS_TOKEN;
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  const apiVersion = process.env.WHATSAPP_API_VERSION;
   const { to, text } = req.body || {};
-  if (!token || !phoneNumberId || !apiVersion) {
-    return res.status(503).json({ error: 'WhatsApp Business API is not configured' });
-  }
   if (!to || !text) return res.status(400).json({ error: 'to and text are required' });
-  try {
-    const response = await fetch(`https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messaging_product: 'whatsapp', recipient_type: 'individual', to, type: 'text', text: { body: text } }),
-    });
-    const body = await response.json();
-    if (!response.ok) return res.status(response.status).json({ error: body.error?.message || 'WhatsApp send failed' });
-    res.json(body);
-  } catch (error) {
-    res.status(502).json({ error: error.message });
-  }
+  const result = await sendWhatsAppMessage(to, text);
+  if (!result.ok) return res.status(result.simulated ? 503 : 502).json({ error: result.error });
+  res.json(result.body);
 });
 
 app.get('/api/industries', (req, res) => {
@@ -81,6 +94,23 @@ app.post('/api/:industry/workflow/:itemId/advance', (req, res) => {
   const result = advanceWorkflow(req.params.industry, req.params.itemId);
   if (result.error) return res.status(400).json({ error: result.error });
   res.json(result);
+});
+
+// 「扮演客户」测试入口：走的是和真实 webhook 完全相同的 conversationEngine，
+// 差别只在于消息来源不是 Meta 而是职员自己在平台里打字模拟——因为本地开发
+// 环境没有公网地址，Meta 打不到这台机器，这是唯一能端到端验证对话逻辑的办法。
+app.post('/api/:industry/whatsapp/simulate', (req, res) => {
+  if (!CONFIG[req.params.industry]) return res.status(404).json({ error: 'unknown industry' });
+  const { phone, text } = req.body || {};
+  if (!phone || !text) return res.status(400).json({ error: 'phone and text are required' });
+  const result = handleInboundMessage({ industry: req.params.industry, phone, text });
+  if (result.error) return res.status(400).json({ error: result.error });
+  res.json(result);
+});
+
+app.get('/api/:industry/assistant/audit', (req, res) => {
+  if (!CONFIG[req.params.industry]) return res.status(404).json({ error: 'unknown industry' });
+  res.json({ entries: getAuditLog(req.params.industry, Number(req.query.limit) || 30) });
 });
 
 app.post('/api/:industry/dispatch', (req, res) => {
