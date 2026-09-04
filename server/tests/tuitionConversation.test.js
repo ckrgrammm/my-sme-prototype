@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { handleInboundMessage } from '../assistant/conversationEngine.js';
-import { isConfirmation } from '../assistant/tuitionIntake.js';
+import { isConfirmation, matchName } from '../assistant/tuitionIntake.js';
 import { verifyWorkflowPayment } from '../workflow.js';
 
 function converse(phone, messages) {
@@ -21,6 +21,19 @@ test('negative confirmation text never confirms an enrolment', () => {
   ]);
   assert.equal(result.item.stage, 'cancelled');
   assert.equal(result.item.needsAttention, false);
+});
+
+test('single-letter and placeholder names cannot advance intake', () => {
+  assert.equal(matchName('a'), null);
+  assert.equal(matchName('test'), null);
+
+  const phone = '+60180001004';
+  const started = converse(phone, ['hello']);
+  const rejected = converse(phone, ['a']);
+  assert.equal(rejected.item.id, started.item.id);
+  assert.equal(rejected.item.missingField, 'guardianName');
+  assert.equal(rejected.item.retryCount, 1);
+  assert.match(rejected.reply, /at least two characters/i);
 });
 
 test('monthly enrolment keeps monthly price and conversation identity', () => {

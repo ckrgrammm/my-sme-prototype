@@ -189,7 +189,10 @@ const NAME_PREAMBLE = /^(my name is|i am|i'm|this is|我是|我叫|本人是)\s*
 export function matchName(text) {
   const trimmed = text.trim().replace(NAME_PREAMBLE, '').trim();
   if (!trimmed || /\d{5,}/.test(trimmed)) return null; // 一长串数字大概率不是名字（比如误输入电话）
-  if (trimmed.length > 60) return null;
+  // 单字母与常见占位词只是测试/无效输入，不能让报名流程继续。
+  // 两个字符仍可覆盖常见的简短中文姓名与英文昵称。
+  if (trimmed.length < 2 || trimmed.length > 60) return null;
+  if (/^(?:test(?:ing)?|n\/?a|none|null|unknown|yes|no)$/i.test(trimmed)) return null;
   return trimmed;
 }
 
@@ -215,11 +218,13 @@ export const FIELD_ORDER = [
     key: 'guardianName',
     prompt: bi('您好！想请问一下，怎么称呼您呢？（家长/监护人姓名）', "Hi! May I have your name (parent/guardian)?"),
     extract: (text) => matchName(text),
+    invalidReply: bi('请输入至少两个字的家长/监护人姓名。', 'Please enter the parent/guardian name using at least two characters.'),
   },
   {
     key: 'studentName',
     prompt: bi('谢谢！请问孩子的姓名是？', "Thanks! And what's your child's name?"),
     extract: (text) => matchName(text),
+    invalidReply: bi('请输入至少两个字的孩子姓名。', "Please enter your child's name using at least two characters."),
   },
   {
     key: 'studentLevel',
