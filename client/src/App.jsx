@@ -12,8 +12,7 @@ import MonthlyScreen from './components/MonthlyScreen.jsx';
 import MoreScreen from './components/MoreScreen.jsx';
 import WorkflowScreen from './components/WorkflowScreen.jsx';
 import { DispatchModal, SwitcherModal } from './components/Modals.jsx';
-
-const DEFAULT_INDUSTRY = 'renovation';
+import { DEFAULT_INDUSTRY, mergeIndustryList } from './industries/index.js';
 
 export default function App() {
   const [industries, setIndustries] = useState([]);
@@ -68,7 +67,7 @@ export default function App() {
 
   // 启动：拉取行业列表；industry 本身已在上面的 useState 初始化时同步定好，这里只需持久化
   useEffect(() => {
-    api.getIndustries().then(setIndustries).catch((e) => setLoadError(e.message));
+    api.getIndustries().then((items) => setIndustries(mergeIndustryList(items))).catch((e) => setLoadError(e.message));
     localStorage.setItem('sme_industry', industry);
   }, []);
 
