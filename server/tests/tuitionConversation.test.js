@@ -26,6 +26,10 @@ test('negative confirmation text never confirms an enrolment', () => {
 test('single-letter and placeholder names cannot advance intake', () => {
   assert.equal(matchName('a'), null);
   assert.equal(matchName('test'), null);
+  assert.equal(matchName('11'), null);
+  assert.equal(matchName('--'), null);
+  assert.equal(matchName('Al'), 'Al');
+  assert.equal(matchName('小明'), '小明');
 
   const phone = '+60180001004';
   const started = converse(phone, ['hello']);
@@ -34,6 +38,16 @@ test('single-letter and placeholder names cannot advance intake', () => {
   assert.equal(rejected.item.missingField, 'guardianName');
   assert.equal(rejected.item.retryCount, 1);
   assert.match(rejected.reply, /at least two characters/i);
+});
+
+test('invalid levels receive a generic format hint before human escalation', () => {
+  const phone = '+60180001005';
+  converse(phone, ['hello', 'Nicole Tan', 'Aiman Tan']);
+  const rejected = converse(phone, ['aa']);
+  assert.equal(rejected.item.missingField, 'studentLevel');
+  assert.equal(rejected.item.retryCount, 1);
+  assert.match(rejected.reply, /couldn't identify that curriculum or level/i);
+  assert.doesNotMatch(rejected.reply, /may mean local primary/i);
 });
 
 test('monthly enrolment keeps monthly price and conversation identity', () => {

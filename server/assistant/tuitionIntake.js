@@ -192,6 +192,8 @@ export function matchName(text) {
   // 单字母与常见占位词只是测试/无效输入，不能让报名流程继续。
   // 两个字符仍可覆盖常见的简短中文姓名与英文昵称。
   if (trimmed.length < 2 || trimmed.length > 60) return null;
+  const letters = trimmed.match(/\p{L}/gu) || [];
+  if (letters.length < 2) return null; // 拒绝 "11"、"--" 等没有真实姓名文字的输入
   if (/^(?:test(?:ing)?|n\/?a|none|null|unknown|yes|no)$/i.test(trimmed)) return null;
   return trimmed;
 }
@@ -230,7 +232,7 @@ export const FIELD_ORDER = [
     key: 'studentLevel',
     prompt: bi('孩子目前是什么学制和年级呢？（例如 Standard 6、Form 3、SPM、IGCSE Year 6）', "What curriculum and year/form is your child in? (e.g. Standard 6, Form 3, SPM, or IGCSE Year 6)"),
     extract: (text) => matchLevel(text),
-    invalidReply: bi('Year 6 可能是本地小学或国际课程，请注明 Standard/UPSR 或 IGCSE。', '“Year 6” may mean local primary or an international curriculum. Please specify Standard/UPSR or IGCSE.'),
+    invalidReply: bi('无法识别该学制或年级。请同时注明学制和年级，例如 Standard 6、Form 3、SPM 或 IGCSE Year 6。', "I couldn't identify that curriculum or level. Please use a format such as Standard 6, Form 3, SPM, or IGCSE Year 6."),
   },
   {
     key: 'subject',
